@@ -14,7 +14,7 @@ Prometheus/Grafana + GitHub Actions/ArgoCD) onto managed Azure services.
 | Experiment tracking | Local MLflow server (`:5000`) | **Azure ML built-in MLflow** (workspace tracking URI) |
 | Model registry | MLflow registry + `champion` alias | **Azure ML Model Registry** + `champion=true` tag (AML has no alias API) |
 | Data versioning | DVC + S3 remote | **Azure ML Data Assets** (versioned, Blob-backed) |
-| Feature store | Feast (SQLite registry + online) | **Feast on Azure** (Blob registry + Azure Cache for Redis) |
+| Feature store | Feast (SQLite registry + online) | **None** — features are a versioned Azure ML **Data Asset** (`march_2025_features`). See docs/module_05_features.md for why, and what AML Managed Feature Store would require |
 | Serving | Flask + gunicorn on minikube | **Azure ML Managed Online Endpoint** (`scoring/score.py`) |
 | Container registry | GHCR | **Azure Container Registry** (created by Bicep) |
 | CI/CD | GitHub Actions + ArgoCD | **Azure DevOps Pipelines** (`azure-pipelines.yml`) |
@@ -52,7 +52,7 @@ src/                    pipeline code (component entry points)
   train/ evaluate/ promote/ monitoring/
   common/config.py      central config + MLflow URI resolver
 scoring/                score.py + conda for the online endpoint
-feature_store/          Feast repo (Azure-configured) + March 2025 features
+data/                   raw/ (bronze, -> energy_raw asset) + features/
 config/config.yaml      resource names, gates, asset versions
 azure-pipelines.yml     Azure DevOps CI/CD (CI → Train → Deploy)
 tests/                  unit tests (run in CI, no Azure needed)

@@ -14,12 +14,12 @@ flowchart TD
     subgraph Pipeline["Azure ML Pipeline (aml/pipeline.yml) on cpu-cluster"]
       P1[prepare_features] --> P2[train<br/>5 models]
       P2 --> P3[evaluate<br/>quality gate]
-      P3 --> P4[promote<br/>champion alias]
+      P3 --> P4[promote<br/>champion tag]
     end
 
     subgraph Hub["Azure ML Workspace"]
       MLF[(MLflow tracking<br/>runs + metrics + plots)]
-      REG[(Model Registry<br/>dam_mcp_forecast<br/>@champion)]
+      REG[(Model Registry<br/>dam_mcp_forecast<br/>champion=true tag)]
     end
 
     subgraph Serve["Managed Online Endpoint"]
@@ -35,8 +35,8 @@ flowchart TD
     P2 -. logs runs .-> MLF
     P2 -. registers .-> REG
     P3 -. tags version .-> REG
-    P4 -. sets @champion .-> REG
-    REG -->|@champion| EP
+    P4 -. tags champion=true .-> REG
+    REG -->|champion tag| EP
     EP -. telemetry .-> AI
     EP -. inference data .-> MON
     A -. baseline .-> MON
@@ -75,17 +75,31 @@ The March 2025 parquet is registered as a versioned **Data Asset**
 (`aml/data_asset.yml`). Bumping `--version` creates an immutable new snapshot,
 the same guarantee DVC gave over S3.
 
-### Feature store — Feast/SQLite → Feast/Azure
-`feature_definitions.py` is copied verbatim (same `dam_mcp_forecast_v1`
-FeatureService). `feature_store.yaml` swaps the local SQLite registry/online
-store for a **Blob registry + Azure Cache for Redis** online store. Training
-reads the offline parquet for reproducibility; serving would hit Redis.
+### Feature store — Feast → removed; features are a Data Asset
+The Feast scaffolding was deleted because **nothing executed it**: no module
+imported `feast`, and training read the parquet straight from the previous
+component's output. A feature store that is never called is not a feature store.
+
+Features are now a **versioned Azure ML Data Asset** — `march_2025_features`,
+registered by the pipeline itself (see the `outputs:` block in
+`aml/pipeline.yml`). That delivers discovery, versioning, and lineage back to
+the producing job with no extra infrastructure.
+
+Azure ML *does* have a Managed Feature Store, and it is the native answer when
+you genuinely need one — point-in-time joins, online serving, feature reuse
+across teams. It is not free of prerequisites: an **ADLS Gen2** offline store
+(hierarchical namespace, which cannot be enabled on an existing account),
+**serverless Spark** for materialisation *and* retrieval, and **Azure Cache for
+Redis** for online lookups. See `docs/module_05_features.md`.
 
 ### Serving — Flask/minikube → Managed Online Endpoint
 The Flask `/predict` route becomes `scoring/score.py` with `init()`/`run()`.
 Azure ML runs the web server, TLS, autoscaling, health probes, and rolling
 deploys — replacing the hand-rolled gunicorn + k8s Deployment + ArgoCD sync.
-The endpoint always serves whatever the `@champion` alias points to.
+The endpoint serves the model version carrying the `champion=true` tag. Note
+that Azure ML does **not** implement MLflow's alias API — `model@champion`
+returns HTTP 404 against a workspace registry — so the champion pointer is a
+tag that CD resolves to a concrete version at deploy time.
 
 ### CI/CD — GitHub Actions/ArgoCD → Azure DevOps
 `azure-pipelines.yml` has three stages: **CI** (ruff + pytest, like the source

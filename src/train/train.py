@@ -18,7 +18,7 @@ workspace instead of a local http://127.0.0.1:5000 server.
 
 Usage (local test, after `az login`):
     python src/train/train.py \
-        --features-dir feature_store/feature_repo/data \
+        --features-dir data/features \
         --model-dir outputs/model --metrics-dir outputs
 """
 

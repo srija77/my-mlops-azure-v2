@@ -54,7 +54,7 @@ def test_prepare_data_time_split_is_ordered():
 
 def test_real_march_data_prepares_if_present():
     """If the bundled March 2025 features exist, they must be servable-shaped."""
-    fp = PROJECT_ROOT / "feature_store" / "feature_repo" / "data" / "march_2025_features.parquet"
+    fp = PROJECT_ROOT / "data" / "features" / "march_2025_features.parquet"
     if not fp.exists():
         pytest.skip("March 2025 features parquet not bundled")
     df = pd.read_parquet(fp)

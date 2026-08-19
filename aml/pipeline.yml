@@ -42,6 +42,29 @@ inputs:
   year: 2025
   month: 3
 
+# ---------------------------------------------------------------------------
+# Pipeline outputs registered as versioned Data Assets.
+#
+# Naming an output turns it from a job-scoped folder into a first-class asset in
+# Data -> Data assets, with its own version history and a lineage edge back to
+# the job that produced it. This is how features get discovery + versioning on
+# Azure ML *without* a feature store: `march_2025_features` is browsable,
+# diffable across runs, and referencable by name from any other job.
+#
+# `version` is omitted deliberately — Azure ML then auto-increments, so every
+# pipeline run adds a version rather than failing on a name collision.
+# ---------------------------------------------------------------------------
+outputs:
+  validated_data:
+    type: uri_folder
+    name: energy_validated
+  prepared_features:
+    type: uri_folder
+    name: march_2025_prepared
+  model_features:
+    type: uri_folder
+    name: march_2025_features
+
 jobs:
   ingest:
     type: command
@@ -56,6 +79,8 @@ jobs:
       silver: ${{parent.jobs.ingest.outputs.silver}}
       min_valid_rate: ${{parent.inputs.min_valid_rate}}
       fail_on_breach: "true"
+    outputs:
+      validated: ${{parent.outputs.validated_data}}
 
   build_features:
     type: command
@@ -64,12 +89,16 @@ jobs:
       validated: ${{parent.jobs.validate.outputs.validated}}
       year: ${{parent.inputs.year}}
       month: ${{parent.inputs.month}}
+    outputs:
+      prepared: ${{parent.outputs.prepared_features}}
 
   prepare:
     type: command
     component: ./components/prepare_features.yml
     inputs:
       input_data: ${{parent.jobs.build_features.outputs.prepared}}
+    outputs:
+      features: ${{parent.outputs.model_features}}
 
   train:
     type: command
