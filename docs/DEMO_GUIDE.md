@@ -29,15 +29,40 @@ Every step below is either a **portal click path** or a **copy-paste command**. 
 
 ---
 
-## Your environment
+## Your environment — fill this in first
+
+> ⚠️ **Every `<PLACEHOLDER>` below is masked on purpose.** This document is in a
+> public repository, so no real subscription IDs, tenant IDs, account names, or
+> resource names appear in it. Fill the table in on your own copy before the demo —
+> **do not commit the filled-in version.**
+
+| Placeholder | Where to get it | Your value |
+|---|---|---|
+| `<YOUR_AZURE_ACCOUNT>` | the email you sign into Azure with | |
+| `<YOUR_SUBSCRIPTION_NAME>` | `az account show --query name -o tsv` | |
+| `<SUBSCRIPTION_ID>` | `az account show --query id -o tsv` | |
+| `<TENANT_ID>` | `az account show --query tenantId -o tsv` | |
+| `<GITHUB_USER>` | your GitHub username | |
+| `<GITHUB_REPO>` | the repo holding this code | |
+| `<SUFFIX>` | the random suffix Azure appends to storage/KV/ACR names — read it off the resource group after Part 2 | |
+| `<YOU>` | your Windows username (in file paths) | |
+
+Print all four Azure values at once:
+
+```powershell
+az account show --query "{account:user.name, subscription:name, subscriptionId:id, tenant:tenantId}" -o table
+```
+
+**Fixed values used throughout this guide** (safe to keep as-is):
 
 | | |
 |---|---|
-| Account | `srija.360digitmg@rediffmail.com` |
-| Subscription | `Azure subscription 1` — `b2acf5e5-7e53-4270-a76b-71adbc172c10` |
-| Tenant | `0c1def5c-2537-4ddb-802e-4ddc7fda6013` |
 | Region | **East US** |
-| Code | https://github.com/srija77/my-mlops-azure-v2 |
+| Resource group | `rg-energy-demo` |
+| Workspace | `mlw-energy-demo` |
+| Compute cluster | `cpu-cluster` |
+| Model | `dam_mcp_forecast` |
+| Endpoint | `dam-mcp-endpoint` |
 
 > ### ⚠️ Quota — read this before changing any VM size
 > This subscription allows **4 Total Regional vCPUs**. That is the single most
@@ -90,7 +115,7 @@ Expected:
 ```
 EnvironmentName    Name                  State    IsDefault
 -----------------  --------------------  -------  -----------
-AzureCloud         Azure subscription 1  Enabled  True
+AzureCloud         <YOUR_SUBSCRIPTION_NAME>  Enabled  True
 ```
 
 > **If `az login` hangs at "Select the account you want to log in with":** press
@@ -144,7 +169,7 @@ Run the whole pipeline once, the day before. This builds the environment Docker 
 2. In the top search bar type **`Resource groups`** → click it
 3. Click **+ Create**
 4. Fill in:
-   - **Subscription:** `Azure subscription 1`
+   - **Subscription:** `<YOUR_SUBSCRIPTION_NAME>`
    - **Resource group:** `rg-energy-demo`
    - **Region:** `(US) East US`
 5. Click **Review + create** → **Create**
@@ -166,7 +191,7 @@ Run the whole pipeline once, the day before. This builds the environment Docker 
 1. Search bar → **`Azure Machine Learning`** → click it
 2. Click **+ Create** → **New workspace**
 3. **Basics** tab:
-   - **Subscription:** `Azure subscription 1`
+   - **Subscription:** `<YOUR_SUBSCRIPTION_NAME>`
    - **Resource group:** `rg-energy-demo`
    - **Workspace name:** `mlw-energy-demo`
    - **Region:** `East US`
@@ -229,8 +254,8 @@ Run the whole pipeline once, the day before. This builds the environment Docker 
 All the pipeline code lives in the GitHub repository. Clone it once:
 
 ```powershell
-cd C:\Users\DHANVISHLP
-git clone https://github.com/srija77/my-mlops-azure-v2.git
+cd C:\Users\<YOU>
+git clone https://github.com/<GITHUB_USER>/<GITHUB_REPO>.git
 cd my-mlops-azure-v2
 ```
 
@@ -283,7 +308,7 @@ docs/                   this guide + teaching modules
 3. **Data source** step: choose **`From local files`** → **Next**
 4. **Destination storage type**: keep **`workspaceblobstore`** (the default) → **Next**
 5. **File or folder selection**: click **Upload** → **Upload folder** → browse to
-   `C:\Users\DHANVISHLP\my-mlops-azure-v2\data\raw` → select it → **Upload**
+   `C:\Users\<YOU>\my-mlops-azure-v2\data\raw` → select it → **Upload**
    - 162 files, ~9.2 MB. Takes about a minute.
 6. **Next** → **Create**
 
@@ -621,7 +646,7 @@ az ml online-deployment create -f aml/endpoints/deployment.yml --set model=azure
 **Create the service principal** — this is the identity GitHub uses to talk to Azure:
 
 ```powershell
-az ad sp create-for-rbac --name "gh-energy-demo" --role Contributor --scopes /subscriptions/b2acf5e5-7e53-4270-a76b-71adbc172c10/resourceGroups/rg-energy-demo --json-auth
+az ad sp create-for-rbac --name "gh-energy-demo" --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-energy-demo --json-auth
 ```
 
 **Copy the entire JSON output.** It is shown once and never again.
@@ -629,7 +654,7 @@ az ad sp create-for-rbac --name "gh-energy-demo" --role Contributor --scopes /su
 **Store it as a GitHub secret:**
 
 ```powershell
-gh secret set AZURE_CREDENTIALS --repo srija77/my-mlops-azure-v2 --body '<paste the whole JSON here>'
+gh secret set AZURE_CREDENTIALS --repo <GITHUB_USER>/<GITHUB_REPO> --body '<paste the whole JSON here>'
 ```
 
 <details>
@@ -639,7 +664,7 @@ GitHub repo → **Settings** → **Secrets and variables** → **Actions** → *
 Name: `AZURE_CREDENTIALS`, Value: the JSON.
 </details>
 
-**The approval gate** is already configured on this repo: **Settings** → **Environments** → **production** → *Required reviewers: srija77*.
+**The approval gate** is already configured on this repo: **Settings** → **Environments** → **production** → *Required reviewers: <GITHUB_USER>*.
 
 ### 12.2 Point the workflow at the demo workspace
 

@@ -6,9 +6,9 @@ the existing `data/march_2025_prepared.parquet` batch directly as the pipeline i
 
 | | |
 |---|---|
-| Subscription | `AiSPRY` (`c93ce21f-642b-4c78-b925-1a29b6046e9d`) |
-| Account | `projectlead@aispry.com` |
-| Tenant | `e4a31943-da03-4fc3-aaf9-f2788a61f796` |
+| Subscription | `<YOUR_SUBSCRIPTION_NAME>` (`<SUBSCRIPTION_ID>`) |
+| Account | `<YOUR_AZURE_ACCOUNT>` |
+| Tenant | `<TENANT_ID>` |
 | Resource group | `rg-energy-mlops` |
 | Region | `eastus` |
 | Workspace | `mlw-energy-forecast` |
@@ -23,7 +23,7 @@ the existing `data/march_2025_prepared.parquet` batch directly as the pipeline i
 
 ```powershell
 az login --use-device-code
-az account set --subscription "c93ce21f-642b-4c78-b925-1a29b6046e9d"
+az account set --subscription "<SUBSCRIPTION_ID>"
 az account show --query "{sub:name, state:state, user:user.name}" -o table
 az extension add -n ml -y          # Azure ML CLI v2
 ```
@@ -56,7 +56,7 @@ Record the printed `storageNameOut`, `acrNameOut`, `workspaceNameOut`,
 az configure --defaults group=rg-energy-mlops workspace=mlw-energy-forecast
 
 # In config/config.yaml set:
-#   azure.subscription_id: "c93ce21f-642b-4c78-b925-1a29b6046e9d"
+#   azure.subscription_id: "<SUBSCRIPTION_ID>"
 #   azure.acr_name:        "<acrNameOut from Stage 1>"
 ```
 

@@ -5,8 +5,8 @@ Everything below is done **in the browser**: [ml.azure.com](https://ml.azure.com
 
 | | |
 |---|---|
-| Subscription | `Azure subscription 1` (`b2acf5e5-7e53-4270-a76b-71adbc172c10`) |
-| Tenant | `0c1def5c-2537-4ddb-802e-4ddc7fda6013` |
+| Subscription | `<YOUR_SUBSCRIPTION_NAME>` (`<SUBSCRIPTION_ID>`) |
+| Tenant | `<TENANT_ID>` |
 | Resource group | `rg-energy-mlops` (eastus) |
 | Workspace | `mlw-energy-forecast` |
 | Compute | `cpu-cluster` — Standard_DS2_v2, 0→2 nodes |
@@ -35,10 +35,10 @@ Six resources. Ask the room: *"which of these is the ML part?"* Only one is:
 | Resource | Why it exists |
 |---|---|
 | `mlw-energy-forecast` | The workspace — the actual MLOps control plane |
-| `stenergyvuzan3y2` | Storage — every dataset, job output, and model artifact |
-| `kv-energy-vuzan3y2` | Key Vault — secrets, connection strings |
-| `acrenergyvuzan3y2` | Container Registry — the environment images jobs run in |
-| `appi-energy-vuzan3y2` | App Insights — job and endpoint telemetry |
+| `st<SUFFIX>` | Storage — every dataset, job output, and model artifact |
+| `kv-energy-<SUFFIX>` | Key Vault — secrets, connection strings |
+| `acrenergy<SUFFIX>` | Container Registry — the environment images jobs run in |
+| `appi-energy-<SUFFIX>` | App Insights — job and endpoint telemetry |
 | Smart Detection | Auto-created alert rule |
 
 **The point:** an Azure ML workspace is never alone. Storage, Key Vault, ACR, and App Insights are dependencies it creates on your behalf. All six were produced by one Bicep file ([`infra/main.bicep`](../infra/main.bicep)) — nobody clicked them into existence, which is why the environment can be rebuilt identically tomorrow.

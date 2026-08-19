@@ -10,7 +10,7 @@ Portal = https://portal.azure.com · ML Studio = https://ml.azure.com
 
 ### 1. Resource group
 1. Portal → search **Resource groups** → **+ Create**.
-2. Subscription **AiSPRY** · Name **`rg-energy-mlops`** · Region **East US** → **Review + create** → **Create**.
+2. Subscription **<YOUR_SUBSCRIPTION_NAME>** · Name **`rg-energy-mlops`** · Region **East US** → **Review + create** → **Create**.
 
 ### 2. Storage account
 1. Portal → **Storage accounts** → **+ Create**.

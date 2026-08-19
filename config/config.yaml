@@ -7,7 +7,7 @@
 
 azure:
   # Set these to match your subscription / infra deployment.
-  subscription_id: "b2acf5e5-7e53-4270-a76b-71adbc172c10"
+  subscription_id: "<SUBSCRIPTION_ID>"
   resource_group: "rg-energy-mlops"
   location: "eastus"
   # Azure ML workspace (the MLOps hub — tracking + registry + endpoints live here)
@@ -15,7 +15,7 @@ azure:
   # Managed compute cluster used by the training pipeline
   compute_cluster: "cpu-cluster"
   # Azure Container Registry (created with the workspace by Bicep)
-  acr_name: "acrenergyvuzan3y2"
+  acr_name: "acrenergy<SUFFIX>"
 
 mlflow:
   # In Azure ML, the tracking URI is the workspace itself. Leave blank to let

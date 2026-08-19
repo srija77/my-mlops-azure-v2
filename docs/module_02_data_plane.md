@@ -11,7 +11,7 @@ Azure ML separates three things that beginners collapse into one word, "data":
 
 | Thing | What it is | Lives where | Analogy in the local project |
 |---|---|---|---|
-| **Storage account / container** | Actual bytes on Azure Blob | `stenergygqjy6fau` | your `data/` folder |
+| **Storage account / container** | Actual bytes on Azure Blob | `st<SUFFIX>` | your `data/` folder |
 | **Datastore** | A registered *connection* to that container, holding the auth | `workspaceblobstore` | your S3 remote config in `.dvc/config` |
 | **Data Asset** | A named, versioned *pointer* to a path in a datastore | `energy_raw:1` | a `.dvc` file committed to git |
 
@@ -24,7 +24,7 @@ The single most useful sentence for a class: **a Data Asset does not contain dat
 You can. The job would run. You would lose:
 
 - **Immutability.** Registering uploads to a content-hashed path. Ours became
-  `.../LocalUpload/d990f879cbb66974629bd853afe35fdefe20dd6f2a90ad3bd002b202d15d544d/raw/`.
+  `.../LocalUpload/<CONTENT_HASH>/raw/`.
   That hash is the same idea as DVC's md5 — overwrite the source folder tomorrow and `energy_raw:1` still resolves to what March 2025 actually looked like.
 - **Lineage.** Studio can answer "which model versions were trained on this data?" only if the data is an asset.
 - **Reproducibility of a *retrain*.** `--set inputs.raw_data.path=azureml:energy_raw:2` is a one-line diff that fully describes a data change.

@@ -1,8 +1,8 @@
 # 01 — Provisioned Azure Resources (live inventory)
 
-Provisioned **2026-08-19** under subscription **Azure subscription 1**
-(`b2acf5e5-7e53-4270-a76b-71adbc172c10`), account `srija.360digitmg@rediffmail.com`,
-tenant `0c1def5c-2537-4ddb-802e-4ddc7fda6013` (`Default Directory`).
+Provisioned **2026-08-19** under subscription **<YOUR_SUBSCRIPTION_NAME>**
+(`<SUBSCRIPTION_ID>`), account `<YOUR_AZURE_ACCOUNT>`,
+tenant `<TENANT_ID>` (`Default Directory`).
 
 Resource group **`rg-energy-mlops`** — region **`eastus`**.
 
@@ -29,10 +29,10 @@ a fresh subscription needs this before anything deploys):
 
 | # | Resource | Name | Type / SKU | Purpose |
 |---|----------|------|------------|---------|
-| 1 | Storage account | `stenergyvuzan3y2` | StorageV2 / Standard_LRS | Default datastore (data assets, job outputs, models) |
-| 2 | Key Vault | `kv-energy-vuzan3y2` | standard, RBAC | Secrets / connection strings |
-| 3 | Application Insights | `appi-energy-vuzan3y2` | web | Job + endpoint telemetry |
-| 4 | Container Registry | `acrenergyvuzan3y2` | Standard | AML environment + endpoint images |
+| 1 | Storage account | `st<SUFFIX>` | StorageV2 / Standard_LRS | Default datastore (data assets, job outputs, models) |
+| 2 | Key Vault | `kv-energy-<SUFFIX>` | standard, RBAC | Secrets / connection strings |
+| 3 | Application Insights | `appi-energy-<SUFFIX>` | web | Job + endpoint telemetry |
+| 4 | Container Registry | `acrenergy<SUFFIX>` | Standard | AML environment + endpoint images |
 | 5 | Azure ML workspace | `mlw-energy-forecast` | Basic, SystemAssigned identity | MLOps control plane |
 | 6 | Compute cluster | `cpu-cluster` | **Standard_DS2_v2**, 0→2 nodes | Runs the pipeline (scales to 0) |
 
@@ -53,15 +53,15 @@ a fresh subscription needs this before anything deploys):
 
 | Item | Value |
 |---|---|
-| Repository | https://github.com/srija77/my-mlops-azure-v2 (**private**) |
+| Repository | https://github.com/<GITHUB_USER>/<GITHUB_REPO> (visibility: set by you) |
 | Workflow | [`.github/workflows/mlops.yml`](../.github/workflows/mlops.yml) — ci → train → deploy |
-| Environment | `production` (created; **no approval gate** — required reviewers need a public repo or a paid plan on GitHub Free) |
+| Environment | `production` with a required-reviewer approval gate (needs a public repo, or a paid plan for private repos, on GitHub Free) |
 | Secret needed | `AZURE_CREDENTIALS` — output of `az ad sp create-for-rbac ... --json-auth` |
 
 ## Studio links
 
-- **Workspace:** https://ml.azure.com/?wsid=/subscriptions/b2acf5e5-7e53-4270-a76b-71adbc172c10/resourcegroups/rg-energy-mlops/workspaces/mlw-energy-forecast&tid=0c1def5c-2537-4ddb-802e-4ddc7fda6013
-- **Pipeline run:** https://ml.azure.com/runs/olive_moon_llsz5zb736?wsid=/subscriptions/b2acf5e5-7e53-4270-a76b-71adbc172c10/resourcegroups/rg-energy-mlops/workspaces/mlw-energy-forecast&tid=0c1def5c-2537-4ddb-802e-4ddc7fda6013
+- **Workspace:** https://ml.azure.com/?wsid=/subscriptions/<SUBSCRIPTION_ID>/resourcegroups/rg-energy-mlops/workspaces/mlw-energy-forecast&tid=<TENANT_ID>
+- **Pipeline run:** https://ml.azure.com/runs/olive_moon_llsz5zb736?wsid=/subscriptions/<SUBSCRIPTION_ID>/resourcegroups/rg-energy-mlops/workspaces/mlw-energy-forecast&tid=<TENANT_ID>
 
 ## Cost notes
 

@@ -84,7 +84,7 @@ Concepts map cleanly from Feast: `FeatureView` → **feature set**, `Entity` →
 
 | Requirement | Why | This subscription |
 |---|---|---|
-| **ADLS Gen2** offline store | Materialised features need hierarchical namespace | `stenergyvuzan3y2` has HNS **disabled** — and HNS **cannot be enabled after creation**. Needs a new storage account |
+| **ADLS Gen2** offline store | Materialised features need hierarchical namespace | `st<SUFFIX>` has HNS **disabled** — and HNS **cannot be enabled after creation**. Needs a new storage account |
 | **Serverless Spark** | Materialisation *and* retrieval run on Spark, not on your cluster | Quota is **4 total vCPUs**. AML's smallest Spark instance is 4 cores for the driver alone, before any executor. Unusable |
 | **Azure Cache for Redis** | Online store for low-latency lookups | ~$16+/month, always-on |
 | Separate feature-store workspace | It is its own resource kind | — |
