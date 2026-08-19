@@ -21,7 +21,7 @@ Prometheus/Grafana + GitHub Actions/ArgoCD) onto managed Azure services.
 | Monitoring / drift | Prometheus + Grafana + Evidently | **Azure ML Model Monitoring** + Application Insights |
 | Infra | docker-compose / k8s manifests | **Bicep** (`infra/main.bicep`) |
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full mapping and data flow.
+See **[docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md)** to run the demo end to end, [docs/](docs/) for the doc index, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full mapping and data flow.
 
 ## Pipeline stages (unchanged logic)
 
@@ -61,7 +61,7 @@ docs/                   ARCHITECTURE.md, RUNBOOK.md
 
 ## Quickstart
 
-Full step-by-step is in [docs/RUNBOOK.md](docs/RUNBOOK.md). The short version:
+Full step-by-step — including the portal click paths — is in **[docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md)**. The short version:
 
 ```bash
 az login
