@@ -161,7 +161,16 @@ Restore the file and re-register v3 before continuing.
 
 - **Versions** — one per training run, each linked to the job that produced it
 - **Tags** on the latest: `passed_eval=True`, `eval_rmse`, `eval_mape`
-- **`champion` alias** — points at whichever version currently serves production
+- **`champion=true` tag** — held by exactly one version: the one serving production
+
+> **Worth saying out loud, because it is a genuine Azure gotcha.** MLflow has a
+> first-class *alias* concept (`model@champion`), and most tutorials use it.
+> **Azure ML's registry does not implement it** — the alias API returns HTTP 404
+> against a workspace registry. This project's first run failed on exactly that.
+> So the champion pointer here is a **tag**, and `promote` guarantees only one
+> version carries it. Deployments resolve the tag to a version number.
+> The lesson generalises: *MLflow-compatible* is not *MLflow-identical*, and the
+> gaps only show up when you run it.
 
 Two gates, two different questions — say this explicitly, because people merge them:
 
@@ -180,7 +189,9 @@ Two gates, two different questions — say this explicitly, because people merge
 
 Paste [`scoring/sample_request.json`](../scoring/sample_request.json), hit **Test**, get a price back — in the browser, no code.
 
-Point at **Details**: the deployment is pinned to `dam_mcp_forecast@champion`, not to a version number. Promote a new champion and redeploy; the endpoint follows the alias. Traffic % is where blue/green lives — deploy a challenger at 10%, watch it, then shift.
+Point at **Details**: the deployment is pinned to a concrete model version, and CI/CD resolved that version from the `champion=true` tag at deploy time (see Stop 6 — Azure ML has no working alias API to point at directly). Promote a new champion and the next deploy picks it up automatically.
+
+Traffic % is where blue/green lives — deploy a challenger at 10%, watch it, then shift.
 
 ---
 

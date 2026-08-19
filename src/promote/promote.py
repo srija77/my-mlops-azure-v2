@@ -68,10 +68,64 @@ def latest_version(client, name):
 
 
 def production_version(client, name, alias):
+    """
+    Find the current production model.
+
+    Tries the MLflow alias API first, then falls back to scanning for the
+    `champion` tag. See `set_champion` for why the fallback exists.
+    """
     try:
         return client.get_model_version_by_alias(name, alias)
     except mlflow.exceptions.MlflowException:
+        pass
+
+    tagged = []
+    for stub in client.search_model_versions(f"name='{name}'"):
+        mv = client.get_model_version(name, stub.version)
+        if mv.tags.get(alias) == "true":
+            tagged.append(mv)
+    if not tagged:
         return None
+    # Should only ever be one; if a previous run died mid-swap, newest wins.
+    return max(tagged, key=lambda v: int(v.version))
+
+
+def set_champion(client, name, version, alias):
+    """
+    Mark `version` as the production model.
+
+    Azure ML's MLflow-compatible registry does NOT implement the alias API --
+    `set_registered_model_alias` returns HTTP 404 against a workspace registry
+    (`/api/2.0/mlflow/registered-models/alias` simply is not served). Aliases
+    work against an OSS MLflow server and against Databricks, which is why this
+    code was written that way, but on Azure ML they cannot work at all.
+
+    Azure ML does support model-version TAGS, so the champion pointer is a tag:
+    `champion=true`, held by exactly one version at a time. Deployments then
+    resolve it to a concrete version number rather than an `@champion` reference.
+
+    Tries the alias first anyway, so the same script still does the right thing
+    if it is ever pointed at a real MLflow server.
+    """
+    try:
+        client.set_registered_model_alias(name, alias, version)
+        log.info(f"Set alias '{alias}' on v{version}")
+        return "alias"
+    except mlflow.exceptions.MlflowException as exc:
+        log.warning(f"Alias API unavailable ({exc.__class__.__name__}); using tags instead.")
+
+    # Clear the tag from whoever held it before, so exactly one version carries it.
+    for stub in client.search_model_versions(f"name='{name}'"):
+        if str(stub.version) == str(version):
+            continue
+        mv = client.get_model_version(name, stub.version)
+        if mv.tags.get(alias) == "true":
+            client.delete_model_version_tag(name, stub.version, alias)
+            log.info(f"Cleared '{alias}' tag from v{stub.version}")
+
+    client.set_model_version_tag(name, str(version), alias, "true")
+    log.info(f"Set tag '{alias}=true' on v{version}")
+    return "tag"
 
 
 def eval_metric(client, run_id, key):
@@ -89,11 +143,15 @@ def write_report(report_dir, **fields):
     log.info(f"promote_report.json -> {report_dir} (action={fields.get('action')})")
 
 
-def write_version_file(report_dir, client, name, version, alias):
+def write_version_file(report_dir, client, name, version, alias, mechanism="tag"):
     mv = client.get_model_version(name, version)
     run = client.get_run(mv.run_id)
     info = {
         "model_name": name, "model_version": str(version), "alias": alias,
+        # "tag" on Azure ML, "alias" on an OSS MLflow server. The CD step needs
+        # to know: an alias can be referenced as model@champion, a tag cannot --
+        # it must be resolved to the version number recorded here.
+        "champion_mechanism": mechanism,
         "run_id": run.info.run_id, "run_name": run.info.run_name,
         "eval_rmse": run.data.metrics.get("eval_rmse"),
         "eval_mae": run.data.metrics.get("eval_mae"),
@@ -106,9 +164,8 @@ def write_version_file(report_dir, client, name, version, alias):
 
 
 def promote(client, name, version, alias, report_dir):
-    client.set_registered_model_alias(name, alias, version)
-    log.info(f"Set alias '{alias}' on v{version}")
-    write_version_file(report_dir, client, name, version, alias)
+    mechanism = set_champion(client, name, version, alias)
+    write_version_file(report_dir, client, name, version, alias, mechanism)
 
 
 def main() -> None:

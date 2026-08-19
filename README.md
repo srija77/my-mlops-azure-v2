@@ -12,7 +12,7 @@ Prometheus/Grafana + GitHub Actions/ArgoCD) onto managed Azure services.
 |---|---|---|
 | Pipeline orchestration | DVC (`dvc.yaml`, `dvc repro`) | **Azure ML Pipeline** (`aml/pipeline.yml`, component per stage) |
 | Experiment tracking | Local MLflow server (`:5000`) | **Azure ML built-in MLflow** (workspace tracking URI) |
-| Model registry | MLflow registry + `champion` alias | **Azure ML Model Registry** + `champion` alias |
+| Model registry | MLflow registry + `champion` alias | **Azure ML Model Registry** + `champion=true` tag (AML has no alias API) |
 | Data versioning | DVC + S3 remote | **Azure ML Data Assets** (versioned, Blob-backed) |
 | Feature store | Feast (SQLite registry + online) | **Feast on Azure** (Blob registry + Azure Cache for Redis) |
 | Serving | Flask + gunicorn on minikube | **Azure ML Managed Online Endpoint** (`scoring/score.py`) |
@@ -26,12 +26,12 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full mapping and data f
 ## Pipeline stages (unchanged logic)
 
 ```
-march_2025_prepared.parquet (Data Asset)
+energy_raw (bronze Data Asset)
         │
         ▼  prepare_features   → Feast-style features parquet
         ▼  train              → 5 models, best→AML Model Registry, MLflow runs
         ▼  evaluate  (gate)   → holdout RMSE/MAPE, tag version passed_eval
-        ▼  promote            → champion alias if it beats production
+        ▼  promote            → champion=true tag if it beats production
         ▼  deploy (CD)        → Managed Online Endpoint serves the champion
 ```
 
@@ -82,7 +82,7 @@ az ml job create          -f aml/pipeline.yml
 # 4. Deploy the champion to a real-time endpoint
 az ml online-endpoint   create -f aml/endpoints/endpoint.yml
 az ml online-deployment create -f aml/endpoints/deployment.yml \
-    --set model=azureml:dam_mcp_forecast@champion --all-traffic
+    --set model=azureml:dam_mcp_forecast:$VER --all-traffic   # $VER from the champion=true tag
 
 # 5. Predict
 az ml online-endpoint invoke -n dam-mcp-endpoint --request-file scoring/sample_request.json

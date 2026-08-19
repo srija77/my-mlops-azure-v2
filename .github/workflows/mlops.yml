@@ -90,11 +90,14 @@ jobs:
           echo "Submitted $JOB"
           az ml job stream -n "$JOB"
 
+      # Azure ML's registry does not implement MLflow aliases (the alias API
+      # 404s), so the champion pointer is the tag `champion=true` on exactly one
+      # model version. Everything downstream resolves the tag to a version number.
       - name: Report champion
         run: |
           az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
-          az ml model show --name $MODEL --label champion \
-            --query "{version:version, tags:tags}" -o json
+          az ml model list --name $MODEL \
+            --query "[?tags.champion=='true'].{version:version,rmse:tags.eval_rmse,mape:tags.eval_mape}" -o table
 
   # ---------------------------------------------------------------------
   # DEPLOY — champion -> managed online endpoint.
@@ -120,11 +123,23 @@ jobs:
           az ml online-endpoint show -n $ENDPOINT >/dev/null 2>&1 \
             || az ml online-endpoint create -f aml/endpoints/endpoint.yml
 
+      - name: Resolve champion version
+        id: champion
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          VERSION=$(az ml model list --name $MODEL \
+            --query "[?tags.champion=='true'].version | [0]" -o tsv)
+          if [ -z "$VERSION" ]; then
+            echo "::error::No model version tagged champion=true"; exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Champion is $MODEL:$VERSION"
+
       - name: Deploy champion
         run: |
           az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
           az ml online-deployment create -f aml/endpoints/deployment.yml \
-            --set model=azureml:$MODEL@champion --all-traffic
+            --set model=azureml:$MODEL:${{ steps.champion.outputs.version }} --all-traffic
 
       - name: Smoke test the endpoint
         run: |
