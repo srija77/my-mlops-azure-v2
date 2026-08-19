@@ -1,0 +1,6 @@
+# Managed Online Endpoint — the stable HTTPS front door for predictions.
+# Create/update:  az ml online-endpoint create -f aml/endpoints/endpoint.yml
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
+name: dam-mcp-endpoint
+description: Real-time DAM MCP energy price forecasting endpoint.
+auth_mode: key

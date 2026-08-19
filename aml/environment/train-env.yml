@@ -1,0 +1,9 @@
+# Azure ML Environment for the training pipeline.
+# Register once:  az ml environment create -f aml/environment/train-env.yml
+# Then pipeline components reference it as azureml:energy-train-env@latest
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: energy-train-env
+version: "4"
+description: Training environment for the DAM MCP energy forecasting pipeline.
+image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu22.04:latest
+conda_file: conda.yml

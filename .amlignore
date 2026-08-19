@@ -1,0 +1,38 @@
+# Files excluded from the CODE SNAPSHOT that every component uploads.
+#
+# Each component declares `code: ../..` (the repo root) so `src/` is importable
+# in the job. Without this file that snapshot is ~199 MB, re-uploaded per
+# component per submit. With it, ~1 MB.
+#
+# Syntax is .gitignore's, but this is a SEPARATE file on purpose: .gitignore
+# controls what gets committed, .amlignore controls what gets shipped to compute.
+# Data belongs in Data Assets (mounted at runtime), never in the snapshot.
+
+# Unrelated project vendored into this repo (188 MB)
+windturbine-mlops/
+
+# Data — lives in Blob as the `energy_raw` Data Asset and is mounted, not shipped
+data/
+feature_store/feature_repo/data/
+
+# Python noise
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.venv/
+venv/
+
+# Local run artifacts
+mlruns/
+mlartifacts/
+outputs/
+.coverage
+
+# Docs / IaC are not needed on the compute node
+docs/
+infra/
+
+# OS
+.DS_Store
+Thumbs.db

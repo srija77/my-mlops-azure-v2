@@ -1,0 +1,10 @@
+# Azure ML managed compute cluster for pipeline jobs (scales to 0 when idle).
+# Create:  az ml compute create -f aml/compute.yml
+$schema: https://azuremlschemas.azureedge.net/latest/amlCompute.schema.json
+name: cpu-cluster
+type: amlcompute
+size: Standard_DS3_v2
+min_instances: 0
+max_instances: 2
+idle_time_before_scale_down: 180
+tier: dedicated

@@ -1,0 +1,21 @@
+# Component 1: ingestion (bronze CSVs -> silver Parquet).
+# Replaces the source project's src/1_ingestion/*.py, minus the Selenium scrape
+# (that belongs in a scheduled Function/ADF landing job, not a training cluster).
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: ingest
+display_name: Ingest (bronze -> silver)
+version: "1"
+type: command
+inputs:
+  raw_data:
+    type: uri_folder
+outputs:
+  silver:
+    type: uri_folder
+# `code` is the repo root so `src/` is importable inside the job.
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/ingestion/ingest.py
+  --raw-dir ${{inputs.raw_data}}
+  --output-dir ${{outputs.silver}}

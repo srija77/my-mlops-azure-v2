@@ -1,0 +1,30 @@
+# Component 3: feature engineering (validated -> prepared feature table).
+# Port of the source project's src/3_feature_engineering/1_build_features.py.
+# This is the stage that produces `march_2025_prepared.parquet` — the file the
+# old runbook uploaded by hand because ingestion was skipped. Now the pipeline
+# builds it, so its lineage back to `energy_raw` is recorded by Azure ML.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: build_features
+display_name: Build Features (validated -> prepared)
+version: "1"
+type: command
+inputs:
+  validated:
+    type: uri_folder
+  year:
+    type: integer
+    default: 2025
+  month:
+    type: integer
+    default: 3
+outputs:
+  prepared:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/feature_engineering/build_features.py
+  --validated-dir ${{inputs.validated}}
+  --output-dir ${{outputs.prepared}}
+  --year ${{inputs.year}}
+  --month ${{inputs.month}}

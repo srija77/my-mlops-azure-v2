@@ -1,0 +1,13 @@
+# Registers the March 2025 EDA prepared parquet as a versioned Azure ML Data
+# Asset. This is the pipeline's input — the equivalent of DVC-tracked data.
+# Create:  az ml data create -f aml/data_asset.yml
+#
+# `path` points at the local file here for first upload; AML copies it into the
+# workspace's default Blob datastore and versions it. Re-point to an
+# azureml://datastores/... path once the data lives in Blob.
+$schema: https://azuremlschemas.azureedge.net/latest/data.schema.json
+name: march_2025_prepared
+version: "1"
+type: uri_file
+description: March 2025 energy market EDA-prepared features (DAM/RTM/weather/calendar).
+path: ../data/march_2025_prepared.parquet

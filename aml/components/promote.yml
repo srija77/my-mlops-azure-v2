@@ -1,0 +1,27 @@
+# Component 4: promote latest -> champion alias if it beats production.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: promote_model
+display_name: Promote Model
+version: "1"
+type: command
+inputs:
+  # Ordering edge only — wired to evaluate's output so promote runs after evaluate.
+  eval_signal:
+    type: uri_folder
+  registered_model_name:
+    type: string
+    default: dam_mcp_forecast
+  production_alias:
+    type: string
+    default: champion
+outputs:
+  report:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/promote/promote.py
+  --report-dir ${{outputs.report}}
+  --eval-signal ${{inputs.eval_signal}}
+  --registered-model-name ${{inputs.registered_model_name}}
+  --production-alias ${{inputs.production_alias}}

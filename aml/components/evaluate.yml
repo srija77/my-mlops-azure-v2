@@ -1,0 +1,38 @@
+# Component 3: evaluate latest registered version, gate, tag.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: evaluate_model
+display_name: Evaluate Model
+version: "1"
+type: command
+inputs:
+  features:
+    type: uri_folder
+  # Ordering edge only — wired to train's model output so evaluate runs after train.
+  train_signal:
+    type: uri_folder
+  registered_model_name:
+    type: string
+    default: dam_mcp_forecast
+  experiment:
+    type: string
+    default: dam_mcp_forecast
+  rmse_threshold:
+    type: number
+    default: 1000.0
+  mape_threshold:
+    type: number
+    default: 15.0
+outputs:
+  eval_metrics:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/evaluate/evaluate.py
+  --features-dir ${{inputs.features}}
+  --metrics-dir ${{outputs.eval_metrics}}
+  --train-signal ${{inputs.train_signal}}
+  --registered-model-name ${{inputs.registered_model_name}}
+  --experiment ${{inputs.experiment}}
+  --rmse-threshold ${{inputs.rmse_threshold}}
+  --mape-threshold ${{inputs.mape_threshold}}

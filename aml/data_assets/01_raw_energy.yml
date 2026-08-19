@@ -1,0 +1,37 @@
+# ============================================================================
+# BRONZE — the raw landing zone, registered as a versioned Azure ML Data Asset.
+#
+# This is the pipeline's true starting point and the replacement for `dvc add`
+# in the source project. `az ml data create` uploads the whole folder into the
+# workspace's default Blob datastore (workspaceblobstore) under an immutable
+# path, then records a *pointer* to it as `energy_raw:1`.
+#
+# Why `uri_folder` and not `uri_file` / `mltable`:
+#   uri_file   - one file. Wrong: this is 162 files across 5 sources.
+#   mltable    - a schema-bearing, loadable tabular definition. Wrong here:
+#                the sources have different schemas (DAM 15-min CSV, RTM 30-min
+#                CSV, weather hourly per city, calendar, generation PDFs), and
+#                bronze is by definition unparsed. mltable belongs downstream,
+#                on the validated/feature layers where one schema is true.
+#   uri_folder - a mounted/downloaded directory the job walks itself. Correct.
+#
+# Register:  az ml data create -f aml/data_assets/01_raw_energy.yml
+# Inspect:   az ml data show -n energy_raw -v 1
+# ============================================================================
+$schema: https://azuremlschemas.azureedge.net/latest/data.schema.json
+name: energy_raw
+version: "1"
+type: uri_folder
+description: >-
+  Bronze layer for DAM MCP forecasting — March 2025 as landed by the ingestion
+  job. dam/ and rtm/ are Hive-partitioned daily CSVs (year=/month=/date=),
+  weather/ is one hourly CSV per station (66 stations), calendar/ is the
+  event/festival/election calendar, generation/ holds the daily generation
+  report master CSV plus source PDFs.
+tags:
+  layer: bronze
+  sources: dam,rtm,weather,calendar,generation
+  period: "2025-03"
+  granularity: dam=15min;rtm=30min;weather=1h;calendar=1d
+  provenance: landed-by-ingestion-job
+path: ../../data/raw

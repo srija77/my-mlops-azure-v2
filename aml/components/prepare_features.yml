@@ -1,0 +1,25 @@
+# Component 4: data prep (prepared parquet -> Feast-style features parquet).
+#
+# v2: `input_data` became a uri_folder. It used to be the hand-uploaded
+# `march_2025_prepared:1` uri_file asset; it is now the `prepared` output folder
+# of the build_features component, so the whole chain runs from raw. The script
+# already accepted either (see `_resolve_input`), only the type declaration
+# needed to change.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: prepare_features
+display_name: Prepare Features
+version: "2"
+type: command
+inputs:
+  input_data:
+    type: uri_folder
+outputs:
+  features:
+    type: uri_folder
+# `code` is the repo root so `src/` is importable inside the job.
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/feature_engineering/prepare_features.py
+  --input-dir ${{inputs.input_data}}
+  --output-dir ${{outputs.features}}

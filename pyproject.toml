@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+exclude = ["feature_store/feature_repo/data", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E402"]  # module-level imports after matplotlib.use() are intentional
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

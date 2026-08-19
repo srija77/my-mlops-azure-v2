@@ -1,0 +1,33 @@
+# Component 2: train 5 models, register best into the AML Model Registry.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: train_model
+display_name: Train Models
+version: "1"
+type: command
+inputs:
+  features:
+    type: uri_folder
+  registered_model_name:
+    type: string
+    default: dam_mcp_forecast
+  experiment:
+    type: string
+    default: dam_mcp_forecast
+  test_size:
+    type: number
+    default: 0.2
+outputs:
+  model:
+    type: uri_folder
+  metrics:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/train/train.py
+  --features-dir ${{inputs.features}}
+  --model-dir ${{outputs.model}}
+  --metrics-dir ${{outputs.metrics}}
+  --registered-model-name ${{inputs.registered_model_name}}
+  --experiment ${{inputs.experiment}}
+  --test-size ${{inputs.test_size}}

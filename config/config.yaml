@@ -1,0 +1,49 @@
+# ============================================================================
+# Central configuration for the Azure MLOps pipeline.
+# Edit the `azure:` block once after provisioning (infra/) and every script,
+# component, and pipeline reads from here. Values can also be overridden by
+# environment variables of the same UPPER_SNAKE name (see src/common/config.py).
+# ============================================================================
+
+azure:
+  # Set these to match your subscription / infra deployment.
+  subscription_id: "b2acf5e5-7e53-4270-a76b-71adbc172c10"
+  resource_group: "rg-energy-mlops"
+  location: "eastus"
+  # Azure ML workspace (the MLOps hub — tracking + registry + endpoints live here)
+  workspace_name: "mlw-energy-forecast"
+  # Managed compute cluster used by the training pipeline
+  compute_cluster: "cpu-cluster"
+  # Azure Container Registry (created with the workspace by Bicep)
+  acr_name: "acrenergyvuzan3y2"
+
+mlflow:
+  # In Azure ML, the tracking URI is the workspace itself. Leave blank to let
+  # src/common/config.py resolve it from the workspace via the azureml-mlflow
+  # plugin (mlflow.get_tracking_uri() after set_config), or paste the
+  # `azureml://...` URI printed by `az ml workspace show --query mlflow_tracking_uri`.
+  tracking_uri: ""
+  experiment: "dam_mcp_forecast"
+  registered_model_name: "dam_mcp_forecast"
+  production_alias: "champion"
+
+data:
+  target_col: "dam_mcp"
+  timestamp_col: "event_timestamp"
+  # Registered Azure ML data asset holding the March 2025 features (Blob-backed).
+  features_asset: "march_2025_features"
+  features_asset_version: "1"
+
+feature_store:
+  feature_service: "dam_mcp_forecast_v1"
+
+serving:
+  endpoint_name: "dam-mcp-endpoint"
+  deployment_name: "champion"
+  instance_type: "Standard_DS2_v2"
+  instance_count: 1
+
+quality_gates:
+  # Same gating semantics as the source project's evaluate.py.
+  rmse_threshold: 1000.0
+  mape_threshold: 15.0

@@ -1,0 +1,134 @@
+# ============================================================================
+# Azure DevOps CI/CD pipeline — the analogue of the source repo's GitHub
+# Actions ml-ci.yml. Three stages:
+#   CI      — lint + unit tests
+#   Train   — register AML assets, submit the training pipeline, gate on results
+#   Deploy  — roll the champion model out to the managed online endpoint
+#
+# Prereqs (one-time):
+#   - An ARM service connection named by variable `azureServiceConnection`
+#     with Contributor + AzureML Data Scientist on the resource group.
+#   - Variable group `energy-mlops` with: resourceGroup, workspaceName.
+# ============================================================================
+trigger:
+  branches:
+    include: [main]
+
+pr:
+  branches:
+    include: [main]
+
+variables:
+  - group: energy-mlops
+  - name: azureServiceConnection
+    value: 'energy-mlops-sc'
+  - name: pythonVersion
+    value: '3.10'
+
+stages:
+  # ── CI: lint + test ──────────────────────────────────────────────────────
+  - stage: CI
+    displayName: Lint & Test
+    jobs:
+      - job: test
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+          - script: |
+              python -m pip install --upgrade pip
+              pip install ruff pytest pytest-cov
+              pip install -r environment/requirements.txt
+            displayName: Install deps
+          - script: ruff check src/ tests/
+            displayName: Lint (ruff)
+          - script: pytest tests/ -v --cov=src --cov-report=term-missing
+            displayName: Unit tests
+
+  # ── Train: submit the AML pipeline, gate on eval + promotion ─────────────
+  - stage: Train
+    displayName: Train Pipeline (Azure ML)
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: submit
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+          - task: AzureCLI@2
+            displayName: Register AML assets (env, compute, data)
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az extension add -n ml -y
+                az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
+                az ml environment create -f aml/environment/train-env.yml || true
+                az ml compute create -f aml/compute.yml || true
+                az ml data create -f aml/data_asset.yml || true
+          - task: AzureCLI@2
+            displayName: Submit training pipeline and wait
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
+                RUN=$(az ml job create -f aml/pipeline.yml --query name -o tsv)
+                echo "Submitted pipeline job: $RUN"
+                az ml job stream -n "$RUN"
+                STATUS=$(az ml job show -n "$RUN" --query status -o tsv)
+                echo "Final status: $STATUS"
+                if [ "$STATUS" != "Completed" ]; then
+                  echo "##vso[task.logissue type=error]Training pipeline did not complete ($STATUS)"
+                  exit 1
+                fi
+
+  # ── Deploy: roll champion model to the online endpoint ───────────────────
+  - stage: Deploy
+    displayName: Deploy Champion to Endpoint
+    dependsOn: Train
+    condition: succeeded()
+    jobs:
+      - deployment: deployEndpoint
+        environment: energy-prod   # gate here with approvals in Azure DevOps
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: Create/refresh endpoint + champion deployment
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az extension add -n ml -y
+                      az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
+                      # Idempotent: create endpoint if missing.
+                      az ml online-endpoint show -n dam-mcp-endpoint >/dev/null 2>&1 \
+                        || az ml online-endpoint create -f aml/endpoints/endpoint.yml
+                      # Deploy the current champion (alias resolved at deploy time).
+                      az ml online-deployment create \
+                        -f aml/endpoints/deployment.yml \
+                        --set model=azureml:dam_mcp_forecast@champion \
+                        --all-traffic
+                - task: AzureCLI@2
+                  displayName: Smoke test endpoint
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
+                      az ml online-endpoint invoke -n dam-mcp-endpoint \
+                        --request-file scoring/sample_request.json

@@ -1,0 +1,333 @@
+{
+  "run_id": "221aca18-1b46-4b07-9bbc-37e1969278c0",
+  "date": "2025-03-31",
+  "mode": "local",
+  "run_at": "2026-06-28T15:25:07.069452",
+  "cities": {
+    "Durg_Chhattisgarh": {
+      "city": "Durg_Chhattisgarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Raipur_Chhattisgarh": {
+      "city": "Raipur_Chhattisgarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bilaspur_Chhattisgarh": {
+      "city": "Bilaspur_Chhattisgarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Korba_Chhattisgarh": {
+      "city": "Korba_Chhattisgarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Gandhinagar_Gujarat": {
+      "city": "Gandhinagar_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Ahmedabad_Gujarat": {
+      "city": "Ahmedabad_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Surat_Gujarat": {
+      "city": "Surat_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Vadodara_Gujarat": {
+      "city": "Vadodara_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Indore_Madhya_Pradesh": {
+      "city": "Indore_Madhya_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bhopal_Madhya_Pradesh": {
+      "city": "Bhopal_Madhya_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Jabalpur_Madhya_Pradesh": {
+      "city": "Jabalpur_Madhya_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Mumbai_Maharashtra": {
+      "city": "Mumbai_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Pune_Maharashtra": {
+      "city": "Pune_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Nagpur_Maharashtra": {
+      "city": "Nagpur_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Nashik_Maharashtra": {
+      "city": "Nashik_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Aurangabad_Maharashtra": {
+      "city": "Aurangabad_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Visakhapatnam_Andhra_Pradesh": {
+      "city": "Visakhapatnam_Andhra_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Hyderabad_Telangana": {
+      "city": "Hyderabad_Telangana",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bangalore_Karnataka": {
+      "city": "Bangalore_Karnataka",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Chennai_Tamil_Nadu": {
+      "city": "Chennai_Tamil_Nadu",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Coimbatore_Tamil_Nadu": {
+      "city": "Coimbatore_Tamil_Nadu",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Madurai_Tamil_Nadu": {
+      "city": "Madurai_Tamil_Nadu",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Thiruvananthapuram_Kerala": {
+      "city": "Thiruvananthapuram_Kerala",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Ernakulam_Kerala": {
+      "city": "Ernakulam_Kerala",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Mysore_Karnataka": {
+      "city": "Mysore_Karnataka",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bellary_Karnataka": {
+      "city": "Bellary_Karnataka",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Patna_Bihar": {
+      "city": "Patna_Bihar",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Ranchi_Jharkhand": {
+      "city": "Ranchi_Jharkhand",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Dhanbad_Jharkhand": {
+      "city": "Dhanbad_Jharkhand",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bhubaneswar_Odisha": {
+      "city": "Bhubaneswar_Odisha",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Rourkela_Odisha": {
+      "city": "Rourkela_Odisha",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Kolkata_West_Bengal": {
+      "city": "Kolkata_West_Bengal",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Durgapur_West_Bengal": {
+      "city": "Durgapur_West_Bengal",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "New_Delhi_Delhi": {
+      "city": "New_Delhi_Delhi",
+      "status": "SUCCESS",
+      "rows": 744
+    },
+    "Lucknow_Uttar_Pradesh": {
+      "city": "Lucknow_Uttar_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Kanpur_Uttar_Pradesh": {
+      "city": "Kanpur_Uttar_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Varanasi_Uttar_Pradesh": {
+      "city": "Varanasi_Uttar_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Jaipur_Rajasthan": {
+      "city": "Jaipur_Rajasthan",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Jodhpur_Rajasthan": {
+      "city": "Jodhpur_Rajasthan",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Ludhiana_Punjab": {
+      "city": "Ludhiana_Punjab",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Amritsar_Punjab": {
+      "city": "Amritsar_Punjab",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Chandigarh": {
+      "city": "Chandigarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Dehradun_Uttarakhand": {
+      "city": "Dehradun_Uttarakhand",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Shimla_Himachal_Pradesh": {
+      "city": "Shimla_Himachal_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Srinagar_Jammu_Kashmir": {
+      "city": "Srinagar_Jammu_Kashmir",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Guwahati_Assam": {
+      "city": "Guwahati_Assam",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Shillong_Meghalaya": {
+      "city": "Shillong_Meghalaya",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Agartala_Tripura": {
+      "city": "Agartala_Tripura",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Imphal_Manipur": {
+      "city": "Imphal_Manipur",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Aizawl_Mizoram": {
+      "city": "Aizawl_Mizoram",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Kohima_Nagaland": {
+      "city": "Kohima_Nagaland",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Itanagar_Arunachal_Pradesh": {
+      "city": "Itanagar_Arunachal_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Sipat_Plant_Chhattisgarh": {
+      "city": "Sipat_Plant_Chhattisgarh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Talcher_Plant_Odisha": {
+      "city": "Talcher_Plant_Odisha",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Chandrapur_Plant_Maharashtra": {
+      "city": "Chandrapur_Plant_Maharashtra",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Farakka_Plant_West_Bengal": {
+      "city": "Farakka_Plant_West_Bengal",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bhadla_Solar_Rajasthan": {
+      "city": "Bhadla_Solar_Rajasthan",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Pavagada_Solar_Karnataka": {
+      "city": "Pavagada_Solar_Karnataka",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Charanka_Solar_Gujarat": {
+      "city": "Charanka_Solar_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Kutch_Wind_Gujarat": {
+      "city": "Kutch_Wind_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Kanyakumari_Wind_Tamil_Nadu": {
+      "city": "Kanyakumari_Wind_Tamil_Nadu",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Jaisalmer_Wind_Rajasthan": {
+      "city": "Jaisalmer_Wind_Rajasthan",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Tehri_Dam_Uttarakhand": {
+      "city": "Tehri_Dam_Uttarakhand",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Bhakra_Dam_Himachal_Pradesh": {
+      "city": "Bhakra_Dam_Himachal_Pradesh",
+      "status": "SKIPPED",
+      "rows": 0
+    },
+    "Sardar_Sarovar_Gujarat": {
+      "city": "Sardar_Sarovar_Gujarat",
+      "status": "SKIPPED",
+      "rows": 0
+    }
+  }
+}

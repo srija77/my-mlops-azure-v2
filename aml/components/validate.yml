@@ -1,0 +1,30 @@
+# Component 2: validation (silver -> validated) + the data quality GATE.
+# Replaces the source project's src/2_validation/5_gx_validate_local.py.
+# A breach raises SystemExit, which fails the job, which stops the pipeline
+# before `train` ever starts. The rejected rows still land in `validated/` so
+# the failure is inspectable on the datastore.
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: validate
+display_name: Validate (silver -> validated, quality gate)
+version: "1"
+type: command
+inputs:
+  silver:
+    type: uri_folder
+  min_valid_rate:
+    type: number
+    default: 0.95
+  fail_on_breach:
+    type: string
+    default: "true"
+outputs:
+  validated:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/validation/validate.py
+  --silver-dir ${{inputs.silver}}
+  --output-dir ${{outputs.validated}}
+  --min-valid-rate ${{inputs.min_valid_rate}}
+  --fail-on-breach ${{inputs.fail_on_breach}}

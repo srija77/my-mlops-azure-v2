@@ -1,0 +1,133 @@
+# ============================================================================
+# CI/CD for the Energy DAM MCP forecasting pipeline.
+#
+#   CI      — lint + unit tests. No Azure needed, runs on every push/PR.
+#   TRAIN   — submits the Azure ML pipeline (ingest -> ... -> promote) and waits.
+#   DEPLOY  — ships the champion to the managed online endpoint.
+#             Gated by the `production` GitHub Environment, so a human approves
+#             before anything reaches the endpoint.
+#
+# SETUP (one time):
+#   1. az ad sp create-for-rbac --name "gh-energy-mlops" --role Contributor \
+#        --scopes /subscriptions/<SUB_ID>/resourceGroups/rg-energy-mlops --json-auth
+#   2. Paste the whole JSON into the repo secret AZURE_CREDENTIALS
+#      (Settings -> Secrets and variables -> Actions -> New repository secret)
+#   3. Settings -> Environments -> New environment "production"
+#      -> Required reviewers -> add yourself.   <-- this is the approval gate
+# ============================================================================
+name: mlops
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: "Submit the Azure ML training pipeline"
+        type: boolean
+        default: true
+
+env:
+  RESOURCE_GROUP: rg-energy-mlops
+  WORKSPACE: mlw-energy-forecast
+  ENDPOINT: dam-mcp-endpoint
+  MODEL: dam_mcp_forecast
+
+jobs:
+  # ---------------------------------------------------------------------
+  # CI — fast feedback, no cloud resources touched.
+  # ---------------------------------------------------------------------
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r environment/requirements.txt pytest ruff
+
+      - name: Lint
+        run: ruff check src/ tests/
+
+      - name: Unit tests
+        run: pytest tests/ -q
+
+  # ---------------------------------------------------------------------
+  # TRAIN — submit the AML pipeline and block until it finishes.
+  # `az ml job create --stream` exits non-zero if the pipeline fails, so a
+  # failed data-quality gate or eval gate fails the workflow. That is the
+  # whole point: bad data or a bad model never reaches the deploy job.
+  # ---------------------------------------------------------------------
+  train:
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      job_name: ${{ steps.submit.outputs.job_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure ML CLI
+        run: az extension add -n ml -y
+
+      - name: Submit training pipeline
+        id: submit
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          JOB=$(az ml job create -f aml/pipeline.yml --query name -o tsv)
+          echo "job_name=$JOB" >> $GITHUB_OUTPUT
+          echo "Submitted $JOB"
+          az ml job stream -n "$JOB"
+
+      - name: Report champion
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          az ml model show --name $MODEL --label champion \
+            --query "{version:version, tags:tags}" -o json
+
+  # ---------------------------------------------------------------------
+  # DEPLOY — champion -> managed online endpoint.
+  # `environment: production` makes GitHub pause here for approval.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: train
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure ML CLI
+        run: az extension add -n ml -y
+
+      - name: Create endpoint if absent
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          az ml online-endpoint show -n $ENDPOINT >/dev/null 2>&1 \
+            || az ml online-endpoint create -f aml/endpoints/endpoint.yml
+
+      - name: Deploy champion
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          az ml online-deployment create -f aml/endpoints/deployment.yml \
+            --set model=azureml:$MODEL@champion --all-traffic
+
+      - name: Smoke test the endpoint
+        run: |
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+          az ml online-endpoint invoke -n $ENDPOINT \
+            --request-file scoring/sample_request.json

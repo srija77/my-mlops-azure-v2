@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# Azure
+.azureml/
+*.azureml.json
+
+# MLflow / local artifacts
+mlruns/
+mlartifacts/
+outputs/
+*.pkl
+metrics.json
+eval_metrics.json
+promote_report.json
+
+# Feast local stores
+feature_store/feature_repo/data/registry.db
+feature_store/feature_repo/data/online_store.db
+
+# Keep the March 2025 feature data tracked (small, needed to run the pipeline)
+!feature_store/feature_repo/data/march_2025_features.parquet
+!data/march_2025_prepared.parquet
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Unrelated vendored project (188 MB) — never commit
+windturbine-mlops/

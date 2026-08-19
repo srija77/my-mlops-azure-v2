@@ -1,0 +1,104 @@
+# ============================================================================
+# Azure ML Pipeline Job — the DVC pipeline's replacement.
+#   ingest -> validate -> build_features -> prepare -> train -> evaluate -> promote
+#
+# This is the direct analogue of the source project's dvc.yaml. Azure ML tracks
+# lineage, caches unchanged steps (like `dvc repro`), and runs on the managed
+# compute cluster instead of your laptop.
+#
+# The pipeline now starts at the BRONZE data asset (`energy_raw`), not at a
+# hand-uploaded feature parquet. That matters for three reasons:
+#   1. Lineage — Studio can trace any model version back to the raw CSVs.
+#   2. Reproducibility — no manual step between the data and the model.
+#   3. The quality gate runs on every retrain, so bad data stops the pipeline
+#      instead of quietly training on itself.
+#
+# Submit:
+#   az ml job create -f aml/pipeline.yml
+#   az ml job create -f aml/pipeline.yml --set inputs.raw_data.path=azureml:energy_raw:2
+# ============================================================================
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: energy-forecast-train-pipeline
+experiment_name: dam_mcp_forecast
+description: Ingest -> Validate (gate) -> Features -> Prepare -> Train -> Evaluate (gate) -> Promote.
+
+settings:
+  default_compute: azureml:cpu-cluster
+  # Reuse cached step outputs when inputs are unchanged (DVC repro behaviour).
+  force_rerun: false
+
+inputs:
+  raw_data:
+    type: uri_folder
+    path: azureml:energy_raw:1
+  registered_model_name: dam_mcp_forecast
+  experiment: dam_mcp_forecast
+  # Data gate: share of rows that must pass validation, per source.
+  min_valid_rate: 0.95
+  # Model gate: holdout error the champion must beat.
+  rmse_threshold: 1000.0
+  mape_threshold: 15.0
+  year: 2025
+  month: 3
+
+jobs:
+  ingest:
+    type: command
+    component: ./components/ingest.yml
+    inputs:
+      raw_data: ${{parent.inputs.raw_data}}
+
+  validate:
+    type: command
+    component: ./components/validate.yml
+    inputs:
+      silver: ${{parent.jobs.ingest.outputs.silver}}
+      min_valid_rate: ${{parent.inputs.min_valid_rate}}
+      fail_on_breach: "true"
+
+  build_features:
+    type: command
+    component: ./components/build_features.yml
+    inputs:
+      validated: ${{parent.jobs.validate.outputs.validated}}
+      year: ${{parent.inputs.year}}
+      month: ${{parent.inputs.month}}
+
+  prepare:
+    type: command
+    component: ./components/prepare_features.yml
+    inputs:
+      input_data: ${{parent.jobs.build_features.outputs.prepared}}
+
+  train:
+    type: command
+    component: ./components/train.yml
+    inputs:
+      features: ${{parent.jobs.prepare.outputs.features}}
+      registered_model_name: ${{parent.inputs.registered_model_name}}
+      experiment: ${{parent.inputs.experiment}}
+      test_size: 0.2
+
+  evaluate:
+    type: command
+    component: ./components/evaluate.yml
+    inputs:
+      features: ${{parent.jobs.prepare.outputs.features}}
+      # Ordering edge: consumes train's model output so evaluate runs after
+      # train has registered the new model version it loads from the registry.
+      train_signal: ${{parent.jobs.train.outputs.model}}
+      registered_model_name: ${{parent.inputs.registered_model_name}}
+      experiment: ${{parent.inputs.experiment}}
+      rmse_threshold: ${{parent.inputs.rmse_threshold}}
+      mape_threshold: ${{parent.inputs.mape_threshold}}
+
+  promote:
+    type: command
+    component: ./components/promote.yml
+    inputs:
+      # Ordering edge: consumes evaluate's output so promote runs after the
+      # quality gate + version tagging are done.
+      eval_signal: ${{parent.jobs.evaluate.outputs.eval_metrics}}
+      registered_model_name: ${{parent.inputs.registered_model_name}}
+      production_alias: champion
