@@ -166,8 +166,19 @@ jobs:
           done
           # Failing here is far cheaper than a revision that starts, cannot read
           # its secret, and reports itself as merely "unhealthy".
-          if ! az keyvault secret show --vault-name "$KEYVAULT_NAME" -n aml-endpoint-key >/dev/null 2>&1; then
-            echo "::error::Key Vault secret 'aml-endpoint-key' not found in $KEYVAULT_NAME"
+          #
+          # Distinguish forbidden from missing. They need completely different
+          # fixes and an RBAC-enabled vault returns the former far more often:
+          # Owner and Contributor are MANAGEMENT-plane roles and grant no
+          # data-plane secret access at all, so a service principal that can
+          # create the whole resource group still cannot read one secret.
+          if ! OUT=$(az keyvault secret show --vault-name "$KEYVAULT_NAME" -n aml-endpoint-key 2>&1); then
+            if echo "$OUT" | grep -qiE 'forbidden|does not have secrets get permission|ForbiddenByRbac'; then
+              echo "::error::The CI service principal cannot READ secrets from $KEYVAULT_NAME. Owner/Contributor are management-plane roles; an RBAC-enabled vault needs a data-plane role. Grant it 'Key Vault Secrets User' scoped to the vault."
+            else
+              echo "::error::Key Vault secret 'aml-endpoint-key' not found in $KEYVAULT_NAME. Create it: az ml online-endpoint get-credentials -n $ENDPOINT --query primaryKey -o tsv | az keyvault secret set --vault-name $KEYVAULT_NAME -n aml-endpoint-key --value @-"
+            fi
+            echo "$OUT" | tail -5
             exit 1
           fi
 
