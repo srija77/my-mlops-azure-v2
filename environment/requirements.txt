@@ -1,17 +1,33 @@
-# Training / pipeline dependencies for the Azure ML jobs.
-# Kept close to the source project's versions so results match.
+# Training / pipeline dependencies for the Azure ML jobs, and the environment CI
+# lints and tests against.
+#
+# These versions MIRROR aml/environment/conda.yml, which is what actually runs on
+# the compute cluster. When the two drift, CI passes against libraries the jobs
+# never use -- which is how a green build ships a broken pipeline.
 azure-ai-ml==1.23.0
 azure-identity==1.19.0
-mlflow==2.19.0
+
+# mlflow is pinned to 2.15.1, NOT a later release: azureml-mlflow 1.59.0 requires
+# mlflow-skinny<=2.15.1, so mlflow==2.19.0 is unresolvable alongside it
+# (ResolutionImpossible). aml/environment/conda.yml and scoring/conda.yml already
+# pin 2.15.1; this file was the only one out of step.
+mlflow==2.15.1
 azureml-mlflow==1.59.0
+
 scikit-learn==1.5.2
 xgboost==2.1.3
 statsmodels==0.14.4
 pandas==2.2.3
 numpy==1.26.4
-pyarrow==17.0.0
+pyarrow==15.0.2
 matplotlib==3.9.2
-feast==0.40.1
 PyYAML==6.0.2
-great-expectations==0.18.19
-evidently==0.4.40
+
+# Removed, deliberately -- nothing imports any of them:
+#   feast              the feature-store scaffolding was deleted; see
+#                      docs/ARCHITECTURE.md "Feature store". Features are a
+#                      versioned Data Asset instead.
+#   great-expectations validation is hand-rolled in src/validation/validate.py
+#   evidently          drift is Azure ML Model Monitoring; see aml/monitoring.yml
+# They pulled in hundreds of transitive packages and slowed every CI run for code
+# that does not exist.

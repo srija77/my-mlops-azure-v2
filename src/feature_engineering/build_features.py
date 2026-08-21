@@ -33,10 +33,10 @@ Usage (local test):
       --validated-dir outputs/validated --output-dir outputs/features
 """
 
-import sys
-import glob
 import argparse
+import glob
 import logging
+import sys
 from pathlib import Path
 
 import numpy as np
