@@ -8,8 +8,10 @@
 #             before anything reaches the endpoint.
 #
 # SETUP (one time):
-#   1. az ad sp create-for-rbac --name "gh-energy-mlops" --role Contributor \
+#   1. az ad sp create-for-rbac --name "gh-energy-mlops" --role Owner \
 #        --scopes /subscriptions/<SUB_ID>/resourceGroups/rg-energy-mlops --json-auth
+#      Owner rather than Contributor: infra/app.bicep creates two role
+#      assignments and Contributor excludes Microsoft.Authorization/*/Write.
 #   2. Paste the whole JSON into the repo secret AZURE_CREDENTIALS
 #      (Settings -> Secrets and variables -> Actions -> New repository secret)
 #   3. Settings -> Environments -> New environment "production"
@@ -146,3 +148,47 @@ jobs:
           az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
           az ml online-endpoint invoke -n $ENDPOINT \
             --request-file scoring/sample_request.json
+
+  # ---------------------------------------------------------------------
+  # MONITOR — daily drift schedule.
+  # Architecture diagram edges  EP -. inference data .-> MON  and
+  # A -. baseline .-> MON. Kept in step with the Azure DevOps pipeline's
+  # Monitor stage so the two CI/CD definitions do not drift apart.
+  # ---------------------------------------------------------------------
+  monitor:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure ML CLI
+        run: az extension add -n ml -y
+
+      - name: Create or refresh the drift monitor
+        env:
+          ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+        run: |
+          set -e
+          az configure --defaults group=$RESOURCE_GROUP workspace=$WORKSPACE
+
+          if [ -z "$ALERT_EMAIL" ]; then
+            echo "::error::Repository variable ALERT_EMAIL is not set"; exit 1
+          fi
+
+          # Baseline is produced by the pipeline's reference_data step.
+          if ! az ml data show -n dam_mcp_reference --label latest >/dev/null 2>&1; then
+            echo "::error::Data asset dam_mcp_reference not found - the pipeline reference_data step has not run"
+            exit 1
+          fi
+
+          if az ml schedule show -n dam-mcp-drift-monitor >/dev/null 2>&1; then
+            az ml schedule update -f aml/monitoring.yml \
+              --set create_monitor.alert_notification.emails[0]=$ALERT_EMAIL
+          else
+            az ml schedule create -f aml/monitoring.yml \
+              --set create_monitor.alert_notification.emails[0]=$ALERT_EMAIL
+          fi

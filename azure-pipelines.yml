@@ -1,14 +1,25 @@
 # ============================================================================
-# Azure DevOps CI/CD pipeline — the analogue of the source repo's GitHub
-# Actions ml-ci.yml. Three stages:
-#   CI      — lint + unit tests
-#   Train   — register AML assets, submit the training pipeline, gate on results
-#   Deploy  — roll the champion model out to the managed online endpoint
+# Azure DevOps CI/CD pipeline — the `CICD` subgraph in docs/ARCHITECTURE.md.
 #
-# Prereqs (one-time):
-#   - An ARM service connection named by variable `azureServiceConnection`
-#     with Contributor + AzureML Data Scientist on the resource group.
-#   - Variable group `energy-mlops` with: resourceGroup, workspaceName.
+#   CI      — lint + unit tests                       (diagram node: CI)
+#   Train   — register AML assets, submit the training
+#             pipeline, gate on results               (diagram: TR --> Pipeline)
+#   Deploy  — resolve the champion tag and roll it
+#             out to the managed online endpoint      (diagram: DP --> EP)
+#   Monitor — create/refresh the daily drift schedule (diagram: edges into MON)
+#
+# PREREQS (one-time). None of these live in this repo - they are objects you
+# create at dev.azure.com, which is why a correct YAML file on its own still
+# produces no pipeline anywhere in the Azure portal:
+#   - Azure DevOps organization + project.
+#   - Pipelines -> New pipeline -> point at this repo -> Existing YAML file.
+#   - An ARM service connection named by `azureServiceConnection` below, with
+#     Contributor + AzureML Data Scientist on the resource group.
+#   - Variable group `energy-mlops` containing:
+#       resourceGroup   e.g. rg-energy-mlops
+#       workspaceName   e.g. mlw-energy-forecast
+#       alertEmail      mailbox that receives drift alerts
+#   - Environment `energy-prod` with a required approver (the Deploy gate).
 # ============================================================================
 trigger:
   branches:
@@ -24,9 +35,13 @@ variables:
     value: 'energy-mlops-sc'
   - name: pythonVersion
     value: '3.10'
+  - name: modelName
+    value: 'dam_mcp_forecast'
+  - name: endpointName
+    value: 'dam-mcp-endpoint'
 
 stages:
-  # ── CI: lint + test ──────────────────────────────────────────────────────
+  # -- CI: lint + test ------------------------------------------------------
   - stage: CI
     displayName: Lint & Test
     jobs:
@@ -47,13 +62,14 @@ stages:
           - script: pytest tests/ -v --cov=src --cov-report=term-missing
             displayName: Unit tests
 
-  # ── Train: submit the AML pipeline, gate on eval + promotion ─────────────
+  # -- Train: submit the AML pipeline, gate on eval + promotion -------------
   - stage: Train
     displayName: Train Pipeline (Azure ML)
     dependsOn: CI
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: submit
+        timeoutInMinutes: 120
         pool:
           vmImage: ubuntu-latest
         steps:
@@ -67,11 +83,24 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
+                set -e
                 az extension add -n ml -y
                 az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
-                az ml environment create -f aml/environment/train-env.yml || true
-                az ml compute create -f aml/compute.yml || true
-                az ml data create -f aml/data_asset.yml || true
+
+                # Each create is guarded by a `show` first, so "already exists"
+                # is skipped while a genuine failure still fails the build. The
+                # previous blanket `|| true` swallowed both cases alike.
+                az ml environment show -n energy-train-env --label latest >/dev/null 2>&1 \
+                  || az ml environment create -f aml/environment/train-env.yml
+                az ml compute show -n cpu-cluster >/dev/null 2>&1 \
+                  || az ml compute create -f aml/compute.yml
+
+                # BRONZE asset. aml/pipeline.yml takes `azureml:energy_raw:1` as
+                # its input, so energy_raw is the asset that must exist here.
+                # Registering aml/data_asset.yml (march_2025_prepared) instead
+                # left the pipeline with no input at all on a fresh workspace.
+                az ml data show -n energy_raw -v 1 >/dev/null 2>&1 \
+                  || az ml data create -f aml/data_assets/01_raw_energy.yml
           - task: AzureCLI@2
             displayName: Submit training pipeline and wait
             inputs:
@@ -79,6 +108,7 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
+                set -e
                 az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
                 RUN=$(az ml job create -f aml/pipeline.yml --query name -o tsv)
                 echo "Submitted pipeline job: $RUN"
@@ -90,14 +120,15 @@ stages:
                   exit 1
                 fi
 
-  # ── Deploy: roll champion model to the online endpoint ───────────────────
+  # -- Deploy: roll champion to the online endpoint -------------------------
   - stage: Deploy
     displayName: Deploy Champion to Endpoint
     dependsOn: Train
     condition: succeeded()
     jobs:
       - deployment: deployEndpoint
-        environment: energy-prod   # gate here with approvals in Azure DevOps
+        environment: energy-prod   # approval gate configured in Azure DevOps
+        timeoutInMinutes: 60
         pool:
           vmImage: ubuntu-latest
         strategy:
@@ -112,15 +143,31 @@ stages:
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
+                      set -e
                       az extension add -n ml -y
                       az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
-                      # Idempotent: create endpoint if missing.
-                      az ml online-endpoint show -n dam-mcp-endpoint >/dev/null 2>&1 \
+
+                      # Idempotent: create the endpoint only if missing.
+                      az ml online-endpoint show -n $(endpointName) >/dev/null 2>&1 \
                         || az ml online-endpoint create -f aml/endpoints/endpoint.yml
-                      # Deploy the current champion (alias resolved at deploy time).
+
+                      # REG -->|champion tag| EP
+                      # The Azure ML workspace registry does NOT implement the
+                      # MLflow alias API: azureml:MODEL@champion returns HTTP
+                      # 404. The champion pointer is the tag champion=true on
+                      # exactly one version, so resolve it to a real number
+                      # before deploying.
+                      VERSION=$(az ml model list --name $(modelName) \
+                        --query "[?tags.champion=='true'].version | [0]" -o tsv)
+                      if [ -z "$VERSION" ]; then
+                        echo "##vso[task.logissue type=error]No version of $(modelName) is tagged champion=true"
+                        exit 1
+                      fi
+                      echo "Champion resolved to $(modelName):$VERSION"
+
                       az ml online-deployment create \
                         -f aml/endpoints/deployment.yml \
-                        --set model=azureml:dam_mcp_forecast@champion \
+                        --set model=azureml:$(modelName):$VERSION \
                         --all-traffic
                 - task: AzureCLI@2
                   displayName: Smoke test endpoint
@@ -129,6 +176,65 @@ stages:
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
+                      set -e
                       az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
-                      az ml online-endpoint invoke -n dam-mcp-endpoint \
-                        --request-file scoring/sample_request.json
+                      RESPONSE=$(az ml online-endpoint invoke -n $(endpointName) \
+                        --request-file scoring/sample_request.json)
+                      echo "Response: $RESPONSE"
+
+                      # score.py catches its own exceptions and returns an error
+                      # payload with HTTP 200, so a zero exit code alone does not
+                      # prove the model predicted anything. Inspect the body.
+                      if echo "$RESPONSE" | grep -q '"error"'; then
+                        echo "##vso[task.logissue type=error]Endpoint returned an error payload"
+                        exit 1
+                      fi
+                      if ! echo "$RESPONSE" | grep -q 'predictions'; then
+                        echo "##vso[task.logissue type=error]Endpoint response contained no predictions"
+                        exit 1
+                      fi
+                      echo "Smoke test passed."
+
+  # -- Monitor: daily drift schedule ----------------------------------------
+  # Diagram edges  EP -. inference data .-> MON  and  A -. baseline .-> MON.
+  # A separate stage because it must run after the endpoint exists (the monitor
+  # resolves azureml:ENDPOINT:champion) but must not block the deploy itself.
+  - stage: Monitor
+    displayName: Drift Monitor Schedule
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: schedule
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - task: AzureCLI@2
+            displayName: Create/refresh drift monitor
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -e
+                az extension add -n ml -y
+                az configure --defaults group=$(resourceGroup) workspace=$(workspaceName)
+
+                # The baseline comes from the pipeline reference_data step. If it
+                # is missing, Train never reached that step, and a monitor created
+                # now would simply fail on every scheduled run.
+                if ! az ml data show -n dam_mcp_reference --label latest >/dev/null 2>&1; then
+                  echo "##vso[task.logissue type=error]Data asset dam_mcp_reference not found - the pipeline reference_data step has not run"
+                  exit 1
+                fi
+
+                # `schedule create` errors if the schedule already exists, so
+                # `update` is the idempotent path when the same commit re-runs.
+                if az ml schedule show -n dam-mcp-drift-monitor >/dev/null 2>&1; then
+                  az ml schedule update -f aml/monitoring.yml \
+                    --set create_monitor.alert_notification.emails[0]=$(alertEmail)
+                else
+                  az ml schedule create -f aml/monitoring.yml \
+                    --set create_monitor.alert_notification.emails[0]=$(alertEmail)
+                fi
+                az ml schedule show -n dam-mcp-drift-monitor -o yaml

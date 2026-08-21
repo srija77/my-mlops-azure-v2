@@ -1,10 +1,20 @@
 # Azure ML managed compute cluster for pipeline jobs (scales to 0 when idle).
 # Create:  az ml compute create -f aml/compute.yml
+#
+# QUOTA: this subscription has 4 total vCPUs. Standard_DS2_v2 is 2 vCPU, so one
+# cluster node (2) plus the managed online endpoint's Standard_DS2_v2 instance
+# (2) exactly fills it. Two things follow, and both have bitten this project:
+#   - The size must stay DS2_v2. This file previously declared Standard_DS3_v2
+#     (4 vCPU), which does not match the deployed cluster and would consume the
+#     entire quota in a single node, leaving nothing for the endpoint.
+#   - max_instances stays at 1. The pipeline is strictly sequential (each step
+#     consumes the previous step's output), so it never benefits from a second
+#     node, and a scale-out to 2 would starve the endpoint.
 $schema: https://azuremlschemas.azureedge.net/latest/amlCompute.schema.json
 name: cpu-cluster
 type: amlcompute
-size: Standard_DS3_v2
+size: Standard_DS2_v2
 min_instances: 0
-max_instances: 2
+max_instances: 1
 idle_time_before_scale_down: 180
 tier: dedicated

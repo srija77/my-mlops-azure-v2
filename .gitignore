@@ -34,3 +34,8 @@ Thumbs.db
 
 # Unrelated vendored project (188 MB) — never commit
 windturbine-mlops/
+
+# Generated: 7 self-contained copies of src/ for the Azure ML Studio component
+# registration wizard, which cannot resolve `code: ../..` the way the CLI can.
+# Regenerate rather than commit — 732K of duplicated source otherwise.
+aml/ui_components/

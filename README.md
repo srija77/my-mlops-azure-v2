@@ -17,7 +17,7 @@ Prometheus/Grafana + GitHub Actions/ArgoCD) onto managed Azure services.
 | Feature store | Feast (SQLite registry + online) | **None** — features are a versioned Azure ML **Data Asset** (`march_2025_features`). See docs/module_05_features.md for why, and what AML Managed Feature Store would require |
 | Serving | Flask + gunicorn on minikube | **Azure ML Managed Online Endpoint** (`scoring/score.py`) |
 | Container registry | GHCR | **Azure Container Registry** (created by Bicep) |
-| CI/CD | GitHub Actions + ArgoCD | **Azure DevOps Pipelines** (`azure-pipelines.yml`) |
+| CI/CD | GitHub Actions + ArgoCD | **GitHub Actions** (`.github/workflows/mlops.yml`) — ci → train → deploy (approval gate) → monitor |
 | Monitoring / drift | Prometheus + Grafana + Evidently | **Azure ML Model Monitoring** + Application Insights |
 | Infra | docker-compose / k8s manifests | **Bicep** (`infra/main.bicep`) |
 
@@ -52,11 +52,36 @@ src/                    pipeline code (component entry points)
   train/ evaluate/ promote/ monitoring/
   common/config.py      central config + MLflow URI resolver
 scoring/                score.py + conda for the online endpoint
+app/                    inference web app in front of the endpoint
+  main.py               FastAPI: operator UI + JSON API + health/ready
+  schema.py             GENERATED — do not edit; see tools/gen_schema.py
+  aml_client.py         endpoint client (retries, error taxonomy)
+  templates/ static/    the UI
+  Dockerfile            two-stage, non-root, 280 MB (no ML stack)
+  tests/                app unit tests
+tools/gen_schema.py     regenerates app/schema.py from the request contract
+infra/                  main.bicep (ML footprint) + app.bicep (Container Apps)
+docker-compose.yml      run the app locally against the live endpoint
 data/                   raw/ (bronze, -> energy_raw asset) + features/
 config/config.yaml      resource names, gates, asset versions
-azure-pipelines.yml     Azure DevOps CI/CD (CI → Train → Deploy)
+.github/workflows/      mlops.yml  — the model: ci → train → deploy → monitor
+                        app.yml    — the app:   test → build → deploy
+azure-pipelines.yml     unused; equivalent definition for Azure DevOps teams
 tests/                  unit tests (run in CI, no Azure needed)
-docs/                   ARCHITECTURE.md, RUNBOOK.md
+docs/                   ARCHITECTURE.md, DEMO_GUIDE.md
+```
+
+## The inference layer
+
+The managed online endpoint is a keyed HTTPS route speaking a 37-column tabular
+contract — correct for machines, unusable for people. `app/` is the layer in
+front of it: a grouped operator form, a JSON API, and split liveness/readiness
+probes, shipped as a container to Azure Container Apps. The endpoint key is
+resolved from Key Vault at revision start via managed identity, so it exists in
+neither the image nor the template.
+
+```bash
+docker compose up --build     # local, against the live endpoint (see .env.example)
 ```
 
 ## Quickstart

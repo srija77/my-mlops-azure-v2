@@ -1,0 +1,41 @@
+# ============================================================================
+# Component 5: drift reference baseline.
+#
+# ARCHITECTURE DIAGRAM EDGE:  A -. baseline .-> MON
+#
+# Snapshots the training feature distribution and registers it as the versioned
+# data asset `dam_mcp_reference` (named on the pipeline output). That asset is
+# what aml/monitoring.yml compares live endpoint data against — without it the
+# monitor points at an asset that does not exist and every signal errors.
+#
+# Running this INSIDE the pipeline (rather than as a manual az command) is the
+# point: the baseline is regenerated from the exact features the champion was
+# trained on, every retrain, with lineage back to the producing job.
+# ============================================================================
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+name: create_reference_data
+display_name: Create Drift Reference Baseline
+version: "1"
+type: command
+inputs:
+  features:
+    type: uri_folder
+  # Ordering edge only — wired to promote's output so the baseline is cut after
+  # the champion for this run is settled, keeping baseline and champion in step.
+  promote_signal:
+    type: uri_folder
+outputs:
+  # Registered as dam_mcp_reference. Holds reference_data.parquet ONLY: Model
+  # Monitoring reads the folder as one tabular dataset, so no stray files.
+  reference:
+    type: uri_folder
+  # Job-scoped, human-readable per-feature mean/std/min/max.
+  stats:
+    type: uri_folder
+code: ../..
+environment: azureml:energy-train-env@latest
+command: >-
+  python src/monitoring/create_reference_data.py
+  --features-dir ${{inputs.features}}
+  --output-dir ${{outputs.reference}}
+  --stats-dir ${{outputs.stats}}

@@ -35,7 +35,12 @@ FEATURES_FILENAME = "march_2025_features.parquet"
 def main() -> None:
     p = argparse.ArgumentParser(description="Create drift reference baseline")
     p.add_argument("--features-dir", required=True)
-    p.add_argument("--output-dir", required=True)
+    p.add_argument("--output-dir", required=True,
+                   help="Registered as dam_mcp_reference. Parquet ONLY.")
+    p.add_argument("--stats-dir", default=None,
+                   help="Where feature_stats.json goes. Defaults to --output-dir "
+                        "for standalone use; the pipeline passes a separate "
+                        "folder to keep the registered asset parquet-only.")
     args = p.parse_args()
 
     path = Path(args.features_dir)
@@ -46,6 +51,8 @@ def main() -> None:
 
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    stats_dir = Path(args.stats_dir) if args.stats_dir else out
+    stats_dir.mkdir(parents=True, exist_ok=True)
 
     # Keep everything except the entity id; the monitor compares feature + target
     # distributions between this baseline and live production inference data.
@@ -62,11 +69,12 @@ def main() -> None:
         }
         for col in num.columns
     }
-    with open(out / "feature_stats.json", "w") as f:
+    with open(stats_dir / "feature_stats.json", "w") as f:
         json.dump(stats, f, indent=2)
 
     log.info(f"Reference baseline: {ref.shape[0]} rows, {len(stats)} numeric features")
-    log.info(f"Wrote reference_data.parquet + feature_stats.json -> {out}")
+    log.info(f"Wrote reference_data.parquet -> {out}")
+    log.info(f"Wrote feature_stats.json     -> {stats_dir}")
 
 
 if __name__ == "__main__":

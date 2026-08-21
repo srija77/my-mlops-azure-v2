@@ -1,0 +1,126 @@
+/* Operator UI for the DAM MCP forecasting endpoint.
+   Light palette on :root, dark via prefers-color-scheme, so the page follows the
+   operator's OS setting without a toggle to maintain. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #dfe3e8;
+  --text: #14181d;
+  --muted: #5c6773;
+  --accent: #1a6ff0;
+  --accent-text: #ffffff;
+  --warn-bg: #fff6e5;
+  --warn-border: #e0a83a;
+  --error-bg: #fdeced;
+  --error-border: #d64550;
+  --good: #1c8a5a;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --surface: #171c22;
+    --border: #2a323b;
+    --text: #e7ecf1;
+    --muted: #97a3b0;
+    --accent: #4d94ff;
+    --accent-text: #08101c;
+    --warn-bg: #2c2413;
+    --warn-border: #a37a25;
+    --error-bg: #2d1618;
+    --error-border: #b4444e;
+    --good: #3fbe86;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 1.25rem 3rem;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.bar {
+  display: flex; flex-wrap: wrap; gap: 1rem;
+  align-items: center; justify-content: space-between;
+  padding: 1rem 0; margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.bar-left { display: flex; align-items: center; gap: .6rem; }
+.bar h1 { font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--good); }
+.bar-right { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+code {
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: .15rem .4rem; color: var(--muted);
+}
+
+.banner {
+  border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: var(--radius); padding: .75rem 1rem; margin-bottom: 1rem;
+}
+.banner-warn { background: var(--warn-bg); border-left-color: var(--warn-border); }
+.banner-error { background: var(--error-bg); border-left-color: var(--error-border); }
+
+.result {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
+}
+.result-label { color: var(--muted); font-size: .82rem; text-transform: uppercase;
+                letter-spacing: .06em; }
+.result-value { font-size: 2.2rem; font-weight: 650; margin: .3rem 0; letter-spacing: -0.02em;
+                font-variant-numeric: tabular-nums; }
+.result-value .unit { font-size: 1rem; font-weight: 400; color: var(--muted); }
+.result-meta { color: var(--muted); font-size: .85rem; }
+
+.actions {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg); padding: .75rem 0; margin-bottom: .5rem;
+  border-bottom: 1px solid var(--border);
+}
+.hint { color: var(--muted); font-size: .85rem; }
+
+button {
+  font: inherit; font-weight: 550; cursor: pointer;
+  border-radius: var(--radius); padding: .5rem 1.1rem;
+  border: 1px solid var(--border); transition: opacity .15s ease;
+}
+button:disabled { opacity: .6; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+button.ghost { background: var(--surface); color: var(--text); }
+
+fieldset {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1.25rem 1.25rem; margin: 0 0 1rem;
+}
+legend { font-weight: 600; padding: 0 .4rem; }
+.help { color: var(--muted); font-size: .85rem; margin: 0 0 .9rem; }
+
+.grid {
+  display: grid; gap: .75rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.field { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.field-name { color: var(--muted); font-size: .78rem; text-transform: capitalize; }
+
+input, select {
+  font: inherit; width: 100%; padding: .45rem .6rem;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+footer {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+  color: var(--muted); font-size: .85rem;
+  border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1.5rem;
+}
+footer a { color: var(--accent); }

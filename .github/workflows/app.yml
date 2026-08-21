@@ -1,0 +1,246 @@
+# ============================================================================
+# CI/CD for the inference web app (app/).
+#
+#   test   -> ruff + pytest against app/tests           (no Azure, every PR)
+#   build  -> docker buildx -> push to ACR              (main only)
+#   deploy -> bicep -> Azure Container Apps             (main only, gated)
+#
+# Separate from mlops.yml on purpose. The model pipeline retrains on a data or
+# code change and takes ~15 minutes; the app ships on a template tweak and takes
+# ~3. Sharing one workflow would mean every CSS change waits for a training run,
+# and every retrain rebuilds an unchanged image.
+#
+# NOTE ON BUILDING: `az acr build` does NOT work on this subscription — ACR Tasks
+# returns TasksOperationsNotAllowed. The image is therefore built on the GitHub
+# runner with buildx and pushed. Do not "simplify" this back to az acr build.
+#
+# SETUP (in addition to mlops.yml's AZURE_CREDENTIALS and `production`):
+#   Repository variables:
+#     ACR_NAME          the container registry, e.g. acrenergy<suffix>
+#     KEYVAULT_NAME     the key vault,          e.g. kv-energy-<suffix>
+#     APPINSIGHTS_NAME  the App Insights name,  e.g. appi-energy-<suffix>
+#   (<suffix> is derived from the resource group id by infra/main.bicep; read
+#    the real names with: az resource list -g <rg> -o table)
+#   Key Vault secret `aml-endpoint-key` — the endpoint's primary key:
+#     az ml online-endpoint get-credentials -n dam-mcp-endpoint \
+#       --query primaryKey -o tsv | \
+#       az keyvault secret set --vault-name <kv> -n aml-endpoint-key --value @-
+# ============================================================================
+name: app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'infra/app.bicep'
+      - 'tools/gen_schema.py'
+      - '.github/workflows/app.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'infra/app.bicep'
+      - '.github/workflows/app.yml'
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-energy-mlops
+  IMAGE_NAME: dam-mcp-app
+  ENDPOINT: dam-mcp-endpoint
+  CONTAINER_APP: ca-energy-forecast
+
+jobs:
+  # ---------------------------------------------------------------------
+  # TEST — lint and unit tests. Touches no cloud resource, runs on every PR.
+  # ---------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt pytest anyio ruff
+
+      - name: Lint
+        run: ruff check app/ tools/
+
+      - name: Unit tests
+        run: pytest app/tests -q
+
+      # The form, the API validator, and the model's preprocessor must agree on
+      # 37 columns in one order. schema.py is generated; if someone edits it by
+      # hand this diff is non-empty and the build stops.
+      - name: Verify schema is in sync with the request contract
+        run: |
+          python tools/gen_schema.py
+          if ! git diff --exit-code app/schema.py; then
+            echo "::error::app/schema.py is stale. Run: python tools/gen_schema.py"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------
+  # BUILD — image to ACR, tagged with the commit SHA.
+  #
+  # Tagging with the SHA rather than only `latest` is what makes a rollback a
+  # one-liner: every deployed revision names the exact commit that produced it,
+  # and `latest` is a moving pointer you cannot roll back to.
+  # ---------------------------------------------------------------------
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      registry: ${{ steps.meta.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Resolve image coordinates
+        id: meta
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+        run: |
+          set -e
+          if [ -z "$ACR_NAME" ]; then
+            echo "::error::Repository variable ACR_NAME is not set"; exit 1
+          fi
+          SERVER=$(az acr show -n "$ACR_NAME" --query loginServer -o tsv)
+          echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "registry=$SERVER" >> $GITHUB_OUTPUT
+          echo "Building $SERVER/$IMAGE_NAME:${GITHUB_SHA::7}"
+
+      - name: Log in to ACR
+        run: az acr login -n ${{ vars.ACR_NAME }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: app/Dockerfile
+          push: true
+          build-args: |
+            APP_REVISION=${{ steps.meta.outputs.tag }}
+          tags: |
+            ${{ steps.meta.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------
+  # DEPLOY — bicep to Azure Container Apps, then smoke test the live URL.
+  # `environment: production` reuses the same approval gate as the model
+  # deploy, so the same reviewer signs off on both halves of inference.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Preflight — required config and the Key Vault secret
+        env:
+          KEYVAULT_NAME: ${{ vars.KEYVAULT_NAME }}
+          APPINSIGHTS_NAME: ${{ vars.APPINSIGHTS_NAME }}
+        run: |
+          set -e
+          for v in KEYVAULT_NAME APPINSIGHTS_NAME; do
+            if [ -z "${!v}" ]; then echo "::error::Repository variable $v is not set"; exit 1; fi
+          done
+          # Failing here is far cheaper than a revision that starts, cannot read
+          # its secret, and reports itself as merely "unhealthy".
+          if ! az keyvault secret show --vault-name "$KEYVAULT_NAME" -n aml-endpoint-key >/dev/null 2>&1; then
+            echo "::error::Key Vault secret 'aml-endpoint-key' not found in $KEYVAULT_NAME"
+            exit 1
+          fi
+
+      - name: Deploy container app
+        id: deploy
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          KEYVAULT_NAME: ${{ vars.KEYVAULT_NAME }}
+          APPINSIGHTS_NAME: ${{ vars.APPINSIGHTS_NAME }}
+        run: |
+          set -e
+          # The ml extension is not preinstalled on the runner, and the scoring
+          # URI is read from the endpoint rather than hardcoded so the app always
+          # points at whatever the model pipeline actually deployed.
+          az extension add -n ml -y
+          SCORING_URI=$(az ml online-endpoint show -n $ENDPOINT \
+            -g $RESOURCE_GROUP -w mlw-energy-forecast --query scoring_uri -o tsv)
+          echo "Scoring URI: $SCORING_URI"
+
+          URL=$(az deployment group create \
+            -g $RESOURCE_GROUP \
+            -f infra/app.bicep \
+            -p acrName="$ACR_NAME" \
+               keyVaultName="$KEYVAULT_NAME" \
+               appInsightsName="$APPINSIGHTS_NAME" \
+               amlEndpointUrl="$SCORING_URI" \
+               imageTag="${{ needs.build.outputs.image_tag }}" \
+            --query properties.outputs.appUrl.value -o tsv)
+          echo "app_url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployed to $URL"
+
+      - name: Smoke test the live app
+        run: |
+          set -e
+          URL="${{ steps.deploy.outputs.app_url }}"
+
+          # A new revision takes a few seconds to accept traffic; poll rather
+          # than sleeping a fixed guess.
+          for i in $(seq 1 30); do
+            if curl -sf "$URL/health" >/dev/null; then break; fi
+            if [ "$i" = "30" ]; then echo "::error::$URL/health never came up"; exit 1; fi
+            sleep 5
+          done
+          echo "health: $(curl -s "$URL/health")"
+
+          READY=$(curl -s -o /dev/null -w '%{http_code}' "$URL/ready")
+          if [ "$READY" != "200" ]; then
+            echo "::error::/ready returned $READY — the app cannot reach its configuration"
+            exit 1
+          fi
+
+          # End-to-end: the app's own sample row, scored through the real
+          # endpoint. This is the only step that proves app, key, network, and
+          # model all work together.
+          SAMPLE=$(curl -sf "$URL/api/sample")
+          RESPONSE=$(curl -sf -X POST "$URL/api/predict" \
+            -H 'Content-Type: application/json' -d "$SAMPLE")
+          echo "prediction: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"error"'; then
+            echo "::error::App returned an error payload"; exit 1
+          fi
+          if ! echo "$RESPONSE" | grep -q '"prediction"'; then
+            echo "::error::App response contained no prediction"; exit 1
+          fi
+          echo "Smoke test passed: $URL"
+
+      - name: Summary
+        run: |
+          echo "### Inference app deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | ${{ steps.deploy.outputs.app_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image tag | \`${{ needs.build.outputs.image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY

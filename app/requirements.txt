@@ -1,0 +1,12 @@
+# Runtime dependencies for the inference web app.
+#
+# Deliberately does NOT include pandas, scikit-learn, xgboost, or mlflow. This
+# container calls the scoring endpoint over HTTPS; the model runs on Azure ML,
+# not here. Keeping the ML stack out drops the image from ~1.2 GB to ~200 MB and
+# removes an entire class of "the app and the endpoint disagree about the sklearn
+# version" bugs.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+jinja2==3.1.5
+httpx==0.28.1
+python-multipart==0.0.20

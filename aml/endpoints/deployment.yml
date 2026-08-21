@@ -1,13 +1,26 @@
+# ============================================================================
 # Deployment behind the endpoint, serving the champion model.
-# The `model` is resolved to the champion alias at deploy time by the CD
-# pipeline (az ml ... --set model=azureml:dam_mcp_forecast@champion), so this
-# file never hard-codes a version.
 #
-# Create:  az ml online-deployment create -f aml/endpoints/deployment.yml --all-traffic
+# ARCHITECTURE DIAGRAM EDGES IMPLEMENTED HERE:
+#   REG -->|champion tag| EP    the model below is overridden at deploy time
+#                               with the concrete version carrying champion=true
+#   EP -. telemetry .-> AI      app_insights_enabled
+#   EP -. inference data .-> MON  data_collector -> feeds aml/monitoring.yml
+#
+# The `model` line is a SAFE DEFAULT ONLY. Azure ML's workspace registry does
+# not implement the MLflow alias API, so `azureml:dam_mcp_forecast@champion`
+# returns HTTP 404. CD resolves the `champion=true` tag to a version number and
+# overrides this line:
+#
+#   VERSION=$(az ml model list --name dam_mcp_forecast \
+#     --query "[?tags.champion=='true'].version | [0]" -o tsv)
+#   az ml online-deployment create -f aml/endpoints/deployment.yml \
+#     --set model=azureml:dam_mcp_forecast:$VERSION --all-traffic
+# ============================================================================
 $schema: https://azuremlschemas.azureedge.net/latest/managedOnlineDeployment.schema.json
 name: champion
 endpoint_name: dam-mcp-endpoint
-model: azureml:dam_mcp_forecast@champion
+model: azureml:dam_mcp_forecast@latest
 code_configuration:
   code: ../../scoring
   scoring_script: score.py
@@ -26,3 +39,23 @@ liveness_probe:
 readiness_probe:
   initial_delay: 30
   period: 15
+
+# ── EP -. telemetry .-> AI ────────────────────────────────────────────────
+# Routes container stdout/stderr, request counts, and latency to the workspace's
+# Application Insights instance (provisioned by infra/main.bicep, linked to the
+# workspace via the `applicationInsights` property).
+app_insights_enabled: true
+
+# ── EP -. inference data .-> MON ──────────────────────────────────────────
+# Captures live request features and predictions to the workspace blob store,
+# which is what aml/monitoring.yml compares against the training baseline.
+# Without this block the drift monitor has no production data and every signal
+# reports "no data". scoring/score.py must also call the Collector API — the
+# YAML opens the channel, the scoring script fills it.
+data_collector:
+  collections:
+    model_inputs:
+      enabled: 'True'
+    model_outputs:
+      enabled: 'True'
+  sampling_rate: 1.0

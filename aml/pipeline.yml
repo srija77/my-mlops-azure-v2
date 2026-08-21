@@ -1,6 +1,7 @@
 # ============================================================================
 # Azure ML Pipeline Job — the DVC pipeline's replacement.
-#   ingest -> validate -> build_features -> prepare -> train -> evaluate -> promote
+#   ingest -> validate -> build_features -> prepare -> train -> evaluate ->
+#   promote -> reference_data
 #
 # This is the direct analogue of the source project's dvc.yaml. Azure ML tracks
 # lineage, caches unchanged steps (like `dvc repro`), and runs on the managed
@@ -21,7 +22,7 @@ $schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
 type: pipeline
 display_name: energy-forecast-train-pipeline
 experiment_name: dam_mcp_forecast
-description: Ingest -> Validate (gate) -> Features -> Prepare -> Train -> Evaluate (gate) -> Promote.
+description: Ingest -> Validate (gate) -> Features -> Prepare -> Train -> Evaluate (gate) -> Promote -> Baseline.
 
 settings:
   default_compute: azureml:cpu-cluster
@@ -64,6 +65,13 @@ outputs:
   model_features:
     type: uri_folder
     name: march_2025_features
+  # Architecture diagram edge  A -. baseline .-> MON.
+  # aml/monitoring.yml resolves this by name (@latest), so every retrain cuts a
+  # fresh baseline and the drift monitor automatically follows the current
+  # champion's training distribution instead of a stale hand-registered one.
+  reference_baseline:
+    type: uri_folder
+    name: dam_mcp_reference
 
 jobs:
   ingest:
@@ -131,3 +139,17 @@ jobs:
       eval_signal: ${{parent.jobs.evaluate.outputs.eval_metrics}}
       registered_model_name: ${{parent.inputs.registered_model_name}}
       production_alias: champion
+
+  # -- A -. baseline .-> MON -------------------------------------------------
+  # Cuts the drift baseline from the same features the champion trained on and
+  # publishes it as the dam_mcp_reference data asset that aml/monitoring.yml
+  # compares live endpoint traffic against.
+  reference_data:
+    type: command
+    component: ./components/reference_data.yml
+    inputs:
+      features: ${{parent.jobs.prepare.outputs.features}}
+      # Ordering edge: runs after promote so baseline and champion agree.
+      promote_signal: ${{parent.jobs.promote.outputs.report}}
+    outputs:
+      reference: ${{parent.outputs.reference_baseline}}

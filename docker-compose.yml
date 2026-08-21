@@ -1,0 +1,34 @@
+# Local development for the inference app.
+#
+#   az ml online-endpoint show -n dam-mcp-endpoint --query scoring_uri -o tsv
+#   az ml online-endpoint get-credentials -n dam-mcp-endpoint --query primaryKey -o tsv
+#   cp .env.example .env    # paste both values
+#   docker compose up --build
+#
+# Runs the same image CI builds and Container Apps runs, against the same live
+# scoring endpoint. There is no local model and no local mock: a mock would let
+# the app drift away from the endpoint's actual response shape, which is the one
+# thing this container exists to get right.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      args:
+        APP_REVISION: local
+    image: dam-mcp-app:local
+    ports:
+      - "8000:8000"
+    environment:
+      AML_ENDPOINT_URL: ${AML_ENDPOINT_URL:?set AML_ENDPOINT_URL in .env}
+      AML_ENDPOINT_KEY: ${AML_ENDPOINT_KEY:?set AML_ENDPOINT_KEY in .env}
+      AML_DEPLOYMENT: ${AML_DEPLOYMENT:-champion}
+      APP_REVISION: local
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status==200 else 1)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

@@ -4,10 +4,24 @@
 # Action. Runs on a schedule, compares live endpoint inference data against the
 # March 2025 training baseline, and alerts (email / Azure Monitor) on drift.
 #
-# Create:  az ml schedule create -f aml/monitoring.yml
+# ARCHITECTURE DIAGRAM EDGES IMPLEMENTED HERE:
+#   EP -. inference data .-> MON   monitoring_target below reads the
+#                                  model_inputs / model_outputs collections
+#                                  written by the endpoint's data_collector
+#   A  -. baseline      .-> MON    reference_data below reads dam_mcp_reference,
+#                                  cut from the training features by the
+#                                  pipeline's reference_data step
 #
-# Requires: the endpoint deployed with data collection enabled, and a reference
-# data asset `dam_mcp_reference` (see src/monitoring/create_reference_data.py).
+# Create:  az ml schedule create -f aml/monitoring.yml
+# Check:   az ml schedule show -n dam-mcp-drift-monitor
+#
+# PREREQUISITES (both are now produced automatically, but must have run once):
+#   1. The endpoint deployed WITH data collection — aml/endpoints/deployment.yml
+#      sets data_collector, and scoring/score.py calls the Collector API. The
+#      monitor needs at least one day of collected traffic before the first run
+#      reports anything but "no production data".
+#   2. The data asset `dam_mcp_reference` — produced by the pipeline's
+#      reference_data step (aml/components/reference_data.yml).
 # ============================================================================
 $schema: https://azuremlschemas.azureedge.net/latest/monitorSchedule.schema.json
 name: dam-mcp-drift-monitor
@@ -23,19 +37,28 @@ trigger:
 create_monitor:
   compute:
     instance_type: standard_e4s_v3
-    runtime_version: "3.3"
+    runtime_version: "3.4"   # Azure rejects anything else: "Compute runtime version must be 3.4"
   monitoring_target:
     ml_task: regression
+    # EP -. inference data .-> MON
+    # Resolving the deployment by name makes the monitor read that deployment's
+    # collected model_inputs / model_outputs automatically — no manual data
+    # wiring. Format is azureml:<endpoint-name>:<deployment-name>.
     endpoint_deployment_id: azureml:dam-mcp-endpoint:champion
 
   monitoring_signals:
     data_drift:
       type: data_drift
-      # Baseline = the March 2025 training features.
+      # A -. baseline .-> MON
+      # `@latest` deliberately: the pipeline's reference_data step registers a
+      # new version of dam_mcp_reference on every retrain, so the baseline
+      # tracks whatever distribution the current champion learned. Pinning a
+      # version here would silently compare today's traffic against the
+      # distribution of a model that is no longer serving.
       reference_data:
         input_data:
-          type: uri_file
-          path: azureml:dam_mcp_reference:1
+          type: uri_folder
+          path: azureml:dam_mcp_reference@latest
         data_context: training
       features:
         top_n_feature_importance: 10
@@ -47,10 +70,13 @@ create_monitor:
 
     prediction_drift:
       type: prediction_drift
+      # scoring/score.py collects predictions under the column name `dam_mcp`,
+      # matching the target column in this baseline, so the two distributions
+      # are actually comparable.
       reference_data:
         input_data:
-          type: uri_file
-          path: azureml:dam_mcp_reference:1
+          type: uri_folder
+          path: azureml:dam_mcp_reference@latest
         data_context: training
       metric_thresholds:
         numerical:
@@ -60,8 +86,8 @@ create_monitor:
       type: data_quality
       reference_data:
         input_data:
-          type: uri_file
-          path: azureml:dam_mcp_reference:1
+          type: uri_folder
+          path: azureml:dam_mcp_reference@latest
         data_context: training
       metric_thresholds:
         numerical:
@@ -71,4 +97,9 @@ create_monitor:
 
   alert_notification:
     emails:
-      - mlops-alerts@example.com
+      # This repo is PUBLIC, so no real mailbox is committed here. CI injects the
+      # actual address at create/update time from the GitHub repository variable
+      # ALERT_EMAIL:
+      #   az ml schedule create -f aml/monitoring.yml       #     --set create_monitor.alert_notification.emails[0]=$ALERT_EMAIL
+      # Replace this placeholder only in a local copy you do not commit.
+      - alerts@example.com

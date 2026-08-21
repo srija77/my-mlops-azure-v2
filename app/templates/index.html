@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DAM MCP Forecasting</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-left">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>DAM MCP Forecasting</h1>
+    </div>
+    <div class="bar-right">
+      <code title="Model registered in the Azure ML registry">{{ model_name }}</code>
+      <code title="Container revision">{{ revision }}</code>
+    </div>
+  </header>
+
+  {% if not configured %}
+  <div class="banner banner-warn" role="status">
+    <strong>Scoring endpoint not configured.</strong>
+    Set <code>AML_ENDPOINT_URL</code> and <code>AML_ENDPOINT_KEY</code>; the form will
+    render but predictions will fail.
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="banner banner-error" role="alert">
+    <strong>Prediction failed.</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  {% if result %}
+  <section class="result" aria-live="polite">
+    <div class="result-label">Predicted day-ahead market clearing price</div>
+    <div class="result-value">₹{{ "%.2f"|format(result.prediction) }}<span class="unit"> / MWh</span></div>
+    <div class="result-meta">
+      served by <code>{{ result.model }}</code> in {{ result.elapsed_ms }} ms
+    </div>
+  </section>
+  {% endif %}
+
+  <form method="post" action="/predict" id="predict-form">
+    <div class="actions">
+      <button type="submit" class="primary">Predict</button>
+      <button type="button" class="ghost" id="load-sample">Load sample block</button>
+      <span class="hint">37 features — all required by the model's preprocessor.</span>
+    </div>
+
+    {% for title, help_text, fields in groups %}
+    <fieldset>
+      <legend>{{ title }}</legend>
+      <p class="help">{{ help_text }}</p>
+      <div class="grid">
+        {% for name, label in fields %}
+        <label class="field{% if name in binary %} field-flag{% endif %}">
+          <span class="field-name">{{ label }}</span>
+          {% if name in binary %}
+          <select name="{{ name }}">
+            <option value="0" {% if values[name]|float == 0.0 %}selected{% endif %}>No (0)</option>
+            <option value="1" {% if values[name]|float == 1.0 %}selected{% endif %}>Yes (1)</option>
+          </select>
+          {% else %}
+          <input type="text" inputmode="decimal" name="{{ name }}"
+                 value="{{ values[name] }}" autocomplete="off" spellcheck="false">
+          {% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% endfor %}
+  </form>
+
+  <footer>
+    <span>Azure ML managed online endpoint &middot; champion deployment</span>
+    <span><a href="/docs">API docs</a> &middot; <a href="/health">health</a> &middot; <a href="/ready">ready</a></span>
+  </footer>
+
+  <script>
+    // Repopulate the form from the canonical sample row. Fetching it from the API
+    // rather than embedding a second copy in this template keeps one source of
+    // truth: app/schema.py, generated from scoring/sample_request.json.
+    document.getElementById('load-sample').addEventListener('click', async () => {
+      const button = document.getElementById('load-sample');
+      const original = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Loading…';
+      try {
+        const response = await fetch('/api/sample');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const { features } = await response.json();
+        for (const [name, value] of Object.entries(features)) {
+          const field = document.querySelector(`[name="${name}"]`);
+          if (field) field.value = String(value);
+        }
+        button.textContent = 'Sample loaded';
+      } catch (err) {
+        button.textContent = 'Could not load sample';
+        console.error(err);
+      } finally {
+        setTimeout(() => { button.textContent = original; button.disabled = false; }, 1500);
+      }
+    });
+  </script>
+</body>
+</html>

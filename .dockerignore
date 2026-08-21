@@ -1,0 +1,27 @@
+# Build context is the repo root (so the Dockerfile can COPY app/), which means
+# this is the ignore file Docker actually reads — one in app/ would be inert.
+# Everything the running container does not need is excluded: the container calls
+# the scoring endpoint over HTTPS, it does not train, score, or read the dataset.
+.git
+.github
+.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.ipynb_checkpoints
+
+# Training-time and data assets — 10 MB of parquet/CSV that would otherwise be
+# uploaded to the daemon on every build.
+data/
+mlruns/
+aml/
+infra/
+src/
+scoring/
+environment/
+tests/
+tools/
+docs/
+*.md
+azure-pipelines.yml

@@ -646,7 +646,7 @@ az ml online-deployment create -f aml/endpoints/deployment.yml --set model=azure
 **Create the service principal** — this is the identity GitHub uses to talk to Azure:
 
 ```powershell
-az ad sp create-for-rbac --name "gh-energy-demo" --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-energy-demo --json-auth
+az ad sp create-for-rbac --name "gh-energy-demo" --role Owner --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-energy-demo --json-auth
 ```
 
 **Copy the entire JSON output.** It is shown once and never again.
@@ -662,6 +662,19 @@ gh secret set AZURE_CREDENTIALS --repo <GITHUB_USER>/<GITHUB_REPO> --body '<past
 
 GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 Name: `AZURE_CREDENTIALS`, Value: the JSON.
+</details>
+
+**Set the drift-alert variable** — the `monitor` job fails fast without it:
+
+```powershell
+gh variable set ALERT_EMAIL --repo <GITHUB_USER>/<GITHUB_REPO> --body "you@your-domain.com"
+```
+
+<details>
+<summary>Browser alternative</summary>
+
+GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **Variables** tab → **New repository variable**
+Name: `ALERT_EMAIL`, Value: the mailbox that should receive drift alerts.
 </details>
 
 **The approval gate** is already configured on this repo: **Settings** → **Environments** → **production** → *Required reviewers: <GITHUB_USER>*.
